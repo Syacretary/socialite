@@ -13,7 +13,8 @@ import android.view.accessibility.AccessibilityNodeInfo
  * LifelitAccessibilityService
  *
  * Provides real-time smart feature blocking (Shorts, Reels, FYP, and Feeds)
- * with dynamic screen-adaptive bounds measurement and zero-flicker debouncing.
+ * with dynamic screen-adaptive bounds measurement, instant Shorts redirect
+ * back to Beranda, and zero-flicker debouncing.
  */
 class LifelitAccessibilityService : AccessibilityService() {
 
@@ -33,7 +34,7 @@ class LifelitAccessibilityService : AccessibilityService() {
         private const val PREFS_NAME = "lifelit_rules"
         private const val KEY_RULES  = "active_feature_rules"
 
-        private const val NAV_COOLDOWN_MS = 600L
+        private const val NAV_COOLDOWN_MS = 500L
 
         private val MANAGED_PACKAGES = setOf(
             "com.google.android.youtube",
@@ -177,12 +178,9 @@ class LifelitAccessibilityService : AccessibilityService() {
         if (pkg.contains("youtube")) {
             val rules = activeRules["youtube"] ?: return
             if (rules.contains("disable_shorts")) {
-                // Only redirect if user is in dedicated Shorts player, NEVER on Home feed carousel
-                val isHome = isYouTubeHomeTab(root)
-                if (!isHome && isDedicatedYouTubeShorts(root, event)) {
-                    lastNavTimestamp = now
-                    hideOverlayImmediate()
-                    navigateToHome("com.google.android.youtube")
+                if (isYouTubeShortsActive(root, event)) {
+                    redirectToYouTubeHome(root)
+                    return
                 }
             }
         } else if (pkg.contains("instagram")) {
@@ -209,6 +207,135 @@ class LifelitAccessibilityService : AccessibilityService() {
     }
 
     // =========================================================================
+    // YouTube Shorts Redirect to Home Implementation
+    // =========================================================================
+
+    /**
+     * Instantly brings user back to Beranda whenever Shorts is entered:
+     * 1. Closes fullscreen Shorts player via BACK action if open.
+     * 2. Programmatically clicks the "Beranda" / "Home" tab in the bottom pivot_bar.
+     */
+    private fun redirectToYouTubeHome(root: AccessibilityNodeInfo?) {
+        val now = System.currentTimeMillis()
+        if (now - lastNavTimestamp < NAV_COOLDOWN_MS) return
+        lastNavTimestamp = now
+
+        // 1. If in full-screen Shorts player, press BACK to dismiss it immediately
+        performGlobalAction(GLOBAL_ACTION_BACK)
+
+        // 2. Click the Home tab in the navbar directly if available
+        if (root != null) {
+            clickYouTubeHomeTab(root)
+        }
+
+        // 3. Fallback delayed click to Home tab once back action settles
+        handler.postDelayed({
+            val newRoot = rootInActiveWindow
+            if (newRoot != null) {
+                clickYouTubeHomeTab(newRoot)
+            }
+        }, 180L)
+    }
+
+    private fun clickYouTubeHomeTab(root: AccessibilityNodeInfo): Boolean {
+        // 1. Check in pivot_bar
+        val pivotNodes = root.findAccessibilityNodeInfosByViewId("com.google.android.youtube:id/pivot_bar")
+        if (!pivotNodes.isNullOrEmpty()) {
+            val pivot = pivotNodes[0]
+            for (i in 0 until pivot.childCount) {
+                val child = pivot.getChild(i) ?: continue
+                val desc = child.contentDescription?.toString() ?: ""
+                val text = child.text?.toString() ?: ""
+                if (desc.contains("Beranda", ignoreCase = true) || desc.contains("Home", ignoreCase = true) ||
+                    text.contains("Beranda", ignoreCase = true) || text.contains("Home", ignoreCase = true)) {
+                    if (child.isClickable && child.performAction(AccessibilityNodeInfo.ACTION_CLICK)) {
+                        return true
+                    }
+                    for (j in 0 until child.childCount) {
+                        val sub = child.getChild(j) ?: continue
+                        if (sub.isClickable && sub.performAction(AccessibilityNodeInfo.ACTION_CLICK)) {
+                            return true
+                        }
+                    }
+                }
+            }
+        }
+
+        // 2. Global search for Home / Beranda
+        for (label in listOf("Beranda", "Home")) {
+            val nodes = root.findAccessibilityNodeInfosByText(label)
+            if (!nodes.isNullOrEmpty()) {
+                for (node in nodes) {
+                    if (node.isClickable && node.performAction(AccessibilityNodeInfo.ACTION_CLICK)) {
+                        return true
+                    }
+                    val parent = node.parent
+                    if (parent != null && parent.isClickable && parent.performAction(AccessibilityNodeInfo.ACTION_CLICK)) {
+                        return true
+                    }
+                }
+            }
+        }
+        return false
+    }
+
+    private fun isYouTubeShortsActive(root: AccessibilityNodeInfo, event: AccessibilityEvent?): Boolean {
+        // 1. User clicked on a view representing Shorts (either bottom navbar tab or carousel item)
+        if (event != null && event.eventType == AccessibilityEvent.TYPE_VIEW_CLICKED) {
+            val desc = event.contentDescription?.toString() ?: ""
+            val text = event.text?.joinToString() ?: ""
+            if (desc.contains("Shorts", ignoreCase = true) || text.contains("Shorts", ignoreCase = true)) {
+                return true
+            }
+        }
+
+        // 2. Dedicated Shorts full-screen player is active
+        val reelWatchNodes = root.findAccessibilityNodeInfosByViewId("com.google.android.youtube:id/reel_watch_fragment_root")
+        if (!reelWatchNodes.isNullOrEmpty()) return true
+
+        val reelPlayerNodes = root.findAccessibilityNodeInfosByViewId("com.google.android.youtube:id/reel_player_page_container")
+        if (!reelPlayerNodes.isNullOrEmpty()) return true
+
+        // 3. Shorts tab in bottom navigation bar is currently selected
+        val pivotNodes = root.findAccessibilityNodeInfosByViewId("com.google.android.youtube:id/pivot_bar")
+        if (!pivotNodes.isNullOrEmpty()) {
+            val pivot = pivotNodes[0]
+            for (i in 0 until pivot.childCount) {
+                val child = pivot.getChild(i) ?: continue
+                val desc = child.contentDescription?.toString() ?: ""
+                if (desc.contains("Shorts", ignoreCase = true)) {
+                    if (child.isSelected || child.isChecked) return true
+                    if (desc.contains("dipilih", ignoreCase = true) || desc.contains("selected", ignoreCase = true)) return true
+                    for (j in 0 until child.childCount) {
+                        val sub = child.getChild(j) ?: continue
+                        if (sub.isSelected || sub.isChecked) return true
+                    }
+                }
+            }
+        }
+
+        // 4. Fallback: text search for Shorts with selected state
+        val shortsNodes = root.findAccessibilityNodeInfosByText("Shorts")
+        if (!shortsNodes.isNullOrEmpty()) {
+            for (n in shortsNodes) {
+                val desc = n.contentDescription?.toString() ?: ""
+                if (desc.contains("dipilih", ignoreCase = true) || desc.contains("selected", ignoreCase = true)) return true
+                if (n.isSelected || n.isChecked) return true
+                val p = n.parent
+                if (p != null && (p.isSelected || p.isChecked)) return true
+            }
+        }
+
+        // 5. Event class name check
+        val cls = event?.className?.toString() ?: ""
+        if (cls.contains("ReelWatchFragment", ignoreCase = true) || cls.contains("ShortsPlayer", ignoreCase = true)) {
+            return true
+        }
+
+        return false
+    }
+
+    // =========================================================================
     // Debounced State Evaluation (Home Feed vs Search vs Other Tabs)
     // =========================================================================
 
@@ -231,11 +358,17 @@ class LifelitAccessibilityService : AccessibilityService() {
     private fun evaluateYouTube(root: AccessibilityNodeInfo) {
         val rules = activeRules["youtube"] ?: emptySet()
 
+        // If Shorts blocking is on and Shorts is active, redirect immediately
+        if (rules.contains("disable_shorts") && isYouTubeShortsActive(root, null)) {
+            redirectToYouTubeHome(root)
+            return
+        }
+
         if (rules.contains("disable_home")) {
             val isHome = isYouTubeHomeTab(root)
             val isSearching = isSearchActive(root, listOf("search_edit_text", "search_bar", "query"))
 
-            // If user is on Home tab and not searching, show overlay regardless of autoplay
+            // If user is on Home tab and not searching, show overlay
             if (isHome && !isSearching) {
                 cancelPendingHide()
 
@@ -321,12 +454,18 @@ class LifelitAccessibilityService : AccessibilityService() {
     }
 
     private fun isYouTubeHomeTab(root: AccessibilityNodeInfo): Boolean {
-        // 1. Check if other tabs are explicitly selected in pivot_bar
+        // If Shorts full-screen player is active, definitely not Home
+        val reelWatchNodes = root.findAccessibilityNodeInfosByViewId("com.google.android.youtube:id/reel_watch_fragment_root")
+        if (!reelWatchNodes.isNullOrEmpty()) return false
+
+        // Check if other tabs are selected in pivot_bar
         val otherTabLabels = listOf("Subscriptions", "Subskripsi", "You", "Koleksi", "Akun")
         for (label in otherTabLabels) {
             val nodes = root.findAccessibilityNodeInfosByText(label)
             if (!nodes.isNullOrEmpty()) {
                 for (n in nodes) {
+                    val desc = n.contentDescription?.toString() ?: ""
+                    if (desc.contains("dipilih", ignoreCase = true) || desc.contains("selected", ignoreCase = true)) return false
                     if (n.isSelected || n.isChecked) return false
                     val p = n.parent
                     if (p != null && (p.isSelected || p.isChecked)) return false
@@ -334,22 +473,26 @@ class LifelitAccessibilityService : AccessibilityService() {
             }
         }
 
-        // 2. Check if Shorts tab is selected
+        // Check if Shorts tab is selected
         val shortsNodes = root.findAccessibilityNodeInfosByText("Shorts")
         if (!shortsNodes.isNullOrEmpty()) {
             for (n in shortsNodes) {
+                val desc = n.contentDescription?.toString() ?: ""
+                if (desc.contains("dipilih", ignoreCase = true) || desc.contains("selected", ignoreCase = true)) return false
                 if (n.isSelected || n.isChecked) return false
                 val p = n.parent
                 if (p != null && (p.isSelected || p.isChecked)) return false
             }
         }
 
-        // 3. Check if Home tab is selected
+        // Check if Home tab is selected
         val homeLabels = listOf("Beranda", "Home")
         for (label in homeLabels) {
             val nodes = root.findAccessibilityNodeInfosByText(label)
             if (!nodes.isNullOrEmpty()) {
                 for (n in nodes) {
+                    val desc = n.contentDescription?.toString() ?: ""
+                    if (desc.contains("dipilih", ignoreCase = true) || desc.contains("selected", ignoreCase = true)) return true
                     if (n.isSelected || n.isChecked) return true
                     val p = n.parent
                     if (p != null && (p.isSelected || p.isChecked)) return true
@@ -357,35 +500,9 @@ class LifelitAccessibilityService : AccessibilityService() {
             }
         }
 
-        // Fallback: If pivot_bar is present and no other tab is selected, default to Home
+        // Fallback: If pivot_bar is present and Shorts/Subscriptions/You is NOT selected, default to Home
         val pivotNodes = root.findAccessibilityNodeInfosByViewId("com.google.android.youtube:id/pivot_bar")
         return !pivotNodes.isNullOrEmpty()
-    }
-
-    private fun isDedicatedYouTubeShorts(root: AccessibilityNodeInfo, event: AccessibilityEvent?): Boolean {
-        // Check if Shorts tab is explicitly selected in bottom navigation
-        val shortsNodes = root.findAccessibilityNodeInfosByText("Shorts")
-        if (!shortsNodes.isNullOrEmpty()) {
-            for (n in shortsNodes) {
-                if (n.isSelected || n.isChecked) return true
-                val p = n.parent
-                if (p != null && (p.isSelected || p.isChecked)) return true
-            }
-        }
-
-        // Check if full-screen reel player is active (toolbar must be absent)
-        val toolbarNodes = root.findAccessibilityNodeInfosByViewId("com.google.android.youtube:id/toolbar")
-        val isToolbarAbsent = toolbarNodes.isNullOrEmpty()
-
-        if (isToolbarAbsent) {
-            val reelWatchNodes = root.findAccessibilityNodeInfosByViewId("com.google.android.youtube:id/reel_watch_fragment_root")
-            if (!reelWatchNodes.isNullOrEmpty()) return true
-
-            val cls = event?.className?.toString() ?: ""
-            if (cls.contains("ShortsPlayer", ignoreCase = true) || cls.contains("Reel", ignoreCase = true)) return true
-        }
-
-        return false
     }
 
     // ── 2. Instagram Evaluator ───────────────────────────────────────────────
