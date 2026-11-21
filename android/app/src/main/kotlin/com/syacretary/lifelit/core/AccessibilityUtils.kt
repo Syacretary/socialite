@@ -21,12 +21,25 @@ object AccessibilityUtils {
     fun clickNodeOrDescendant(node: AccessibilityNodeInfo?): Boolean {
         if (node == null) return false
         if (node.isClickable && node.performAction(AccessibilityNodeInfo.ACTION_CLICK)) return true
+
+        // Check children (up to 2 levels deep)
         for (i in 0 until node.childCount) {
             val child = node.getChild(i) ?: continue
             if (child.isClickable && child.performAction(AccessibilityNodeInfo.ACTION_CLICK)) return true
+            for (j in 0 until child.childCount) {
+                val grandchild = child.getChild(j) ?: continue
+                if (grandchild.isClickable && grandchild.performAction(AccessibilityNodeInfo.ACTION_CLICK)) return true
+            }
         }
-        val parent = node.parent
-        if (parent != null && parent.isClickable && parent.performAction(AccessibilityNodeInfo.ACTION_CLICK)) return true
+
+        // Check parents (up to 3 levels up)
+        var curr = node.parent
+        var depth = 0
+        while (curr != null && depth < 3) {
+            if (curr.isClickable && curr.performAction(AccessibilityNodeInfo.ACTION_CLICK)) return true
+            curr = curr.parent
+            depth++
+        }
         return false
     }
 

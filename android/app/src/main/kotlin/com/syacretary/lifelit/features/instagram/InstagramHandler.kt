@@ -16,7 +16,7 @@ class InstagramHandler : AppFeatureHandler {
     override val supportedPackages: Set<String> = setOf("com.instagram.android")
 
     private var lastNavTimestamp = 0L
-    private val NAV_COOLDOWN_MS = 1200L
+    private val NAV_COOLDOWN_MS = 600L
 
     override fun onFastRedirect(
         service: AccessibilityService,
@@ -28,6 +28,7 @@ class InstagramHandler : AppFeatureHandler {
         if (now - lastNavTimestamp < NAV_COOLDOWN_MS) return false
 
         val dmOnly = rules.contains("dm_profile_only")
+        val homeBlocked = rules.contains("disable_home") || dmOnly
         val reelsBlocked = rules.contains("disable_reels") || dmOnly
         val friendReelsBlocked = rules.contains("disable_friend_reels") || dmOnly
         val storiesBlocked = rules.contains("hide_stories") || dmOnly
@@ -52,6 +53,16 @@ class InstagramHandler : AppFeatureHandler {
             lastNavTimestamp = now
             InstagramReelsFeature.handleReelsBlocked(service, root, rules, isNavBarReels)
             return true
+        }
+
+        // 3. Fast Home Redirect (Instant redirect away from Beranda to DM without waiting)
+        if (homeBlocked) {
+            val activeTab = InstagramNavigation.getActiveTab(root)
+            if (activeTab == InstagramTab.HOME) {
+                lastNavTimestamp = now
+                val clicked = InstagramHomeFeature.handleHomeBlocked(root)
+                if (clicked) return true
+            }
         }
 
         return false
