@@ -555,8 +555,8 @@ class LifelitAccessibilityService : AccessibilityService() {
             if (isTwitterForYouTab(rootNode)) {
                 overlayManager?.showFeedBlockOverlay(
                     appName  = "X (Twitter)",
-                    title    = "Tab "Untuk Anda" Dibatasi",
-                    subtitle = "Beralih ke tab "Mengikuti" untuk melihat linimasa.",
+                    title    = "Tab 'Untuk Anda' Dibatasi",
+                    subtitle = "Beralih ke tab 'Mengikuti' untuk melihat linimasa.",
                     isDark   = true
                 )
                 return
