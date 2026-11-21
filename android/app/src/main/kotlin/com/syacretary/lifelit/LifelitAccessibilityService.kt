@@ -22,6 +22,7 @@ class LifelitAccessibilityService : AccessibilityService() {
     private val handler = Handler(Looper.getMainLooper())
 
     private var lastNavTimestamp = 0L
+    private var lastDMTimestamp = 0L
     private var currentForegroundPackage: String = ""
 
     private var pendingHideRunnable: Runnable? = null
@@ -189,19 +190,23 @@ class LifelitAccessibilityService : AccessibilityService() {
             val reelsBlocked = rules.contains("disable_reels") || rules.contains("dm_profile_only")
             val friendReelsBlocked = rules.contains("disable_friend_reels") || rules.contains("dm_profile_only")
 
-            // 1. Reels Blocking (Reels tab or Reel link sent by friends in DM)
+            // 1. Reels Blocking (Reels tab, Explore feed, Beranda post, or Reel link sent by friends in DM)
             if (reelsBlocked) {
                 if (isInstagramReelsActive(root, event)) {
-                    val tabBars = root.findAccessibilityNodeInfosByViewId("com.instagram.android:id/tab_bar")
-                    val isNavBarReels = !tabBars.isNullOrEmpty()
+                    val isNavBarReels = isInstagramReelsNavbarActive(root)
+                    val isFromDM = System.currentTimeMillis() - lastDMTimestamp < 2500L
 
-                    // If it is a modal Reel (from DM chat) and friendReels is NOT blocked, allow it!
-                    if (!isNavBarReels && !friendReelsBlocked) {
+                    // If it was opened from DM chat and friendReels is NOT blocked, allow it!
+                    if (isFromDM && !friendReelsBlocked && !isNavBarReels) {
                         // Reel from friend in DM: permitted
                     } else {
                         lastNavTimestamp = now
                         hideOverlayImmediate()
-                        handleInstagramReelsBlocked(root, rules)
+                        if (isNavBarReels) {
+                            redirectToInstagramAllowedScreen(root, rules)
+                        } else {
+                            performGlobalAction(GLOBAL_ACTION_BACK)
+                        }
                         return
                     }
                 }
@@ -718,13 +723,23 @@ class LifelitAccessibilityService : AccessibilityService() {
      * Accurately rejects Search/Explore, DM, Profile, Reels, Stories, and Comments.
      */
     private fun isInstagramHomeFeed(root: AccessibilityNodeInfo): Boolean {
-        if (isInstagramSearchOrExplore(root)) return false
+        // Must not be in DM or Profile
         if (isInstagramDM(root)) return false
         if (isInstagramProfile(root)) return false
-        if (isInstagramReelsActive(root, null)) return false
-        if (isInstagramStoriesActive(root, null)) return false
+        if (isInstagramSearchOrExplore(root)) return false
 
-        // Check if Home tab in tab_bar is selected (tab index 0)
+        // Must not be in fullscreen Reels or Stories viewer
+        if (!root.findAccessibilityNodeInfosByViewId("com.instagram.android:id/clips_viewer_view_pager").isNullOrEmpty()) return false
+        if (!root.findAccessibilityNodeInfosByViewId("com.instagram.android:id/viewer_media_view_root").isNullOrEmpty()) return false
+        if (!root.findAccessibilityNodeInfosByViewId("com.instagram.android:id/story_viewer_fragment").isNullOrEmpty()) return false
+        if (isInstagramReelsNavbarActive(root)) return false
+
+        // 1. Direct indicator: action_bar_inbox_button in action_bar_container
+        // This button ONLY exists on the Home feed in Instagram!
+        if (!root.findAccessibilityNodeInfosByViewId("com.instagram.android:id/action_bar_inbox_button").isNullOrEmpty()) return true
+        if (!root.findAccessibilityNodeInfosByViewId("com.instagram.android:id/action_bar_inbox_icon").isNullOrEmpty()) return true
+
+        // 2. Tab 0 in tab_bar is selected
         val tabBars = root.findAccessibilityNodeInfosByViewId("com.instagram.android:id/tab_bar")
         if (!tabBars.isNullOrEmpty()) {
             val tabBar = tabBars[0]
@@ -736,18 +751,28 @@ class LifelitAccessibilityService : AccessibilityService() {
                         desc.contains("dipilih", ignoreCase = true) || desc.contains("selected", ignoreCase = true)) {
                         return true
                     }
+                    for (j in 0 until homeTab.childCount) {
+                        val sub = homeTab.getChild(j) ?: continue
+                        val subDesc = sub.contentDescription?.toString() ?: ""
+                        if (sub.isSelected || sub.isChecked ||
+                            subDesc.contains("dipilih", ignoreCase = true) || subDesc.contains("selected", ignoreCase = true)) {
+                            return true
+                        }
+                    }
                 }
             }
         }
 
-        // Check for feed-specific view elements
+        // 3. Feed tab ID
         val feedNodes = root.findAccessibilityNodeInfosByViewId("com.instagram.android:id/feed_tab")
         if (!feedNodes.isNullOrEmpty()) {
             for (n in feedNodes) {
                 if (n.isSelected || n.isChecked) return true
             }
+            return true
         }
 
+        // 4. Text indicator for Home / Beranda
         val homeLabels = listOf("Beranda", "Home")
         for (label in homeLabels) {
             val nodes = root.findAccessibilityNodeInfosByText(label)
@@ -762,7 +787,7 @@ class LifelitAccessibilityService : AccessibilityService() {
             }
         }
 
-        // Fallback: If tab_bar is present and Search/Reels/Profile are NOT active, default to Home Feed
+        // 5. Fallback: If tab_bar is present and Search/Reels/Profile are NOT active, default to Home Feed
         return !tabBars.isNullOrEmpty()
     }
 
@@ -773,19 +798,11 @@ class LifelitAccessibilityService : AccessibilityService() {
      * 3. Explore grid or search results displayed
      */
     private fun isInstagramSearchOrExplore(root: AccessibilityNodeInfo): Boolean {
-        // Search EditText in action bar or search page
-        val searchEditIds = listOf(
-            "com.instagram.android:id/action_bar_search_edit_text",
-            "com.instagram.android:id/search_edit_text",
-            "com.instagram.android:id/action_bar_search_layout",
-            "com.instagram.android:id/search_src_text",
-            "com.instagram.android:id/echo_search_like_box"
-        )
-        for (id in searchEditIds) {
-            if (!root.findAccessibilityNodeInfosByViewId(id).isNullOrEmpty()) return true
-        }
+        // If DM inbox button is present, it is definitely Home Feed, never Search/Explore!
+        if (!root.findAccessibilityNodeInfosByViewId("com.instagram.android:id/action_bar_inbox_button").isNullOrEmpty()) return false
+        if (!root.findAccessibilityNodeInfosByViewId("com.instagram.android:id/action_bar_inbox_icon").isNullOrEmpty()) return false
 
-        // Search tab selected in bottom tab bar (index 1)
+        // 1. Search tab selected in bottom tab bar (index 1)
         val tabBars = root.findAccessibilityNodeInfosByViewId("com.instagram.android:id/tab_bar")
         if (!tabBars.isNullOrEmpty()) {
             val tabBar = tabBars[0]
@@ -797,12 +814,32 @@ class LifelitAccessibilityService : AccessibilityService() {
                         desc.contains("dipilih", ignoreCase = true) || desc.contains("selected", ignoreCase = true)) {
                         return true
                     }
+                    for (j in 0 until searchTab.childCount) {
+                        val sub = searchTab.getChild(j) ?: continue
+                        val subDesc = sub.contentDescription?.toString() ?: ""
+                        if (sub.isSelected || sub.isChecked ||
+                            subDesc.contains("dipilih", ignoreCase = true) || subDesc.contains("selected", ignoreCase = true)) {
+                            return true
+                        }
+                    }
                 }
             }
         }
 
-        // Check by text / content description for Search / Explore
-        val searchLabels = listOf("Cari dan jelajahi", "Search and explore", "Cari", "Search")
+        // 2. Search EditText in action bar or search page
+        val searchEditIds = listOf(
+            "com.instagram.android:id/action_bar_search_edit_text",
+            "com.instagram.android:id/search_edit_text",
+            "com.instagram.android:id/action_bar_search_layout",
+            "com.instagram.android:id/search_src_text",
+            "com.instagram.android:id/echo_search_like_box"
+        )
+        for (id in searchEditIds) {
+            if (!root.findAccessibilityNodeInfosByViewId(id).isNullOrEmpty()) return true
+        }
+
+        // 3. Check by text / content description for Search / Explore
+        val searchLabels = listOf("Cari dan jelajahi", "Search and explore")
         for (label in searchLabels) {
             val nodes = root.findAccessibilityNodeInfosByText(label)
             if (!nodes.isNullOrEmpty()) {
@@ -828,36 +865,17 @@ class LifelitAccessibilityService : AccessibilityService() {
         if (event != null && event.eventType == AccessibilityEvent.TYPE_VIEW_CLICKED) {
             val desc = event.contentDescription?.toString() ?: ""
             val text = event.text?.joinToString() ?: ""
-            if (desc.equals("Reels", ignoreCase = true) || text.equals("Reels", ignoreCase = true)) {
+            if (desc.contains("Reels", ignoreCase = true) || text.contains("Reels", ignoreCase = true)) {
                 return true
             }
         }
 
-        // 2. Fullscreen Reels viewer container
-        val reelViewerIds = listOf(
-            "com.instagram.android:id/clips_viewer_view_pager",
-            "com.instagram.android:id/reels_video_container",
-            "com.instagram.android:id/clips_video_container"
-        )
-        for (id in reelViewerIds) {
-            if (!root.findAccessibilityNodeInfosByViewId(id).isNullOrEmpty()) return true
-        }
+        // 2. Fullscreen Reels viewer container (ViewPager2 holding full-screen reel slides)
+        val reelViewerNodes = root.findAccessibilityNodeInfosByViewId("com.instagram.android:id/clips_viewer_view_pager")
+        if (!reelViewerNodes.isNullOrEmpty()) return true
 
         // 3. Reels tab in bottom tab bar is SELECTED
-        val tabBars = root.findAccessibilityNodeInfosByViewId("com.instagram.android:id/tab_bar")
-        if (!tabBars.isNullOrEmpty()) {
-            val tabBar = tabBars[0]
-            for (i in 0 until tabBar.childCount) {
-                val tab = tabBar.getChild(i) ?: continue
-                val desc = tab.contentDescription?.toString() ?: ""
-                if (desc.contains("Reels", ignoreCase = true)) {
-                    if (tab.isSelected || tab.isChecked ||
-                        desc.contains("dipilih", ignoreCase = true) || desc.contains("selected", ignoreCase = true)) {
-                        return true
-                    }
-                }
-            }
-        }
+        if (isInstagramReelsNavbarActive(root)) return true
 
         // 4. Modal Clips Activity / Fragment
         val cls = event?.className?.toString() ?: ""
@@ -865,6 +883,43 @@ class LifelitAccessibilityService : AccessibilityService() {
             return true
         }
 
+        return false
+    }
+
+    private fun isInstagramReelsNavbarActive(root: AccessibilityNodeInfo): Boolean {
+        val tabBars = root.findAccessibilityNodeInfosByViewId("com.instagram.android:id/tab_bar")
+        if (!tabBars.isNullOrEmpty()) {
+            val tabBar = tabBars[0]
+            for (i in 0 until tabBar.childCount) {
+                val tab = tabBar.getChild(i) ?: continue
+                if (isReelsTabSelected(tab)) return true
+            }
+        }
+        val clipsTabs = root.findAccessibilityNodeInfosByViewId("com.instagram.android:id/clips_tab")
+        if (!clipsTabs.isNullOrEmpty()) {
+            for (tab in clipsTabs) {
+                if (tab.isSelected || tab.isChecked) return true
+                val desc = tab.contentDescription?.toString() ?: ""
+                if (desc.contains("dipilih", ignoreCase = true) || desc.contains("selected", ignoreCase = true)) return true
+            }
+        }
+        return false
+    }
+
+    private fun isReelsTabSelected(node: AccessibilityNodeInfo): Boolean {
+        val desc = node.contentDescription?.toString() ?: ""
+        val text = node.text?.toString() ?: ""
+        val resId = node.viewIdResourceName ?: ""
+        if (resId.contains("clips_tab", ignoreCase = true) || desc.contains("Reels", ignoreCase = true) || text.contains("Reels", ignoreCase = true)) {
+            if (node.isSelected || node.isChecked ||
+                desc.contains("dipilih", ignoreCase = true) || desc.contains("selected", ignoreCase = true)) {
+                return true
+            }
+        }
+        for (i in 0 until node.childCount) {
+            val child = node.getChild(i) ?: continue
+            if (isReelsTabSelected(child)) return true
+        }
         return false
     }
 
@@ -892,7 +947,10 @@ class LifelitAccessibilityService : AccessibilityService() {
             "com.instagram.android:id/message_composer_container"
         )
         for (id in ids) {
-            if (!root.findAccessibilityNodeInfosByViewId(id).isNullOrEmpty()) return true
+            if (!root.findAccessibilityNodeInfosByViewId(id).isNullOrEmpty()) {
+                lastDMTimestamp = System.currentTimeMillis()
+                return true
+            }
         }
         return false
     }
