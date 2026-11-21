@@ -221,9 +221,80 @@ class AppManagementProvider extends ChangeNotifier {
       final features = List<AppFeatureBlock>.from(_apps[appIndex].featureBlocks);
       final featIndex = features.indexWhere((f) => f.id == featureId);
       if (featIndex != -1) {
-        features[featIndex] = features[featIndex].copyWith(
-          isBlocked: !features[featIndex].isBlocked,
-        );
+        final currentBlocked = features[featIndex].isBlocked;
+        final targetBlocked = !currentBlocked;
+        features[featIndex] = features[featIndex].copyWith(isBlocked: targetBlocked);
+
+        // ── Adaptive What-If-Else Logic ──────────────────────────────
+        if (appId == 'instagram') {
+          const constituentIds = [
+            'hide_stories',
+            'disable_home',
+            'disable_feeds',
+            'disable_reels',
+            'disable_friend_reels',
+          ];
+
+          if (featureId == 'dm_profile_only') {
+            // Master toggle: turning it ON enables all constituent features; OFF disables all
+            for (var i = 0; i < features.length; i++) {
+              if (constituentIds.contains(features[i].id)) {
+                features[i] = features[i].copyWith(isBlocked: targetBlocked);
+              }
+            }
+          } else {
+            // Child toggle relationship: disable_friend_reels is a child of disable_reels
+            if (featureId == 'disable_reels' && !targetBlocked) {
+              final childIdx = features.indexWhere((f) => f.id == 'disable_friend_reels');
+              if (childIdx != -1) {
+                features[childIdx] = features[childIdx].copyWith(isBlocked: false);
+              }
+            } else if (featureId == 'disable_friend_reels' && targetBlocked) {
+              final parentIdx = features.indexWhere((f) => f.id == 'disable_reels');
+              if (parentIdx != -1) {
+                features[parentIdx] = features[parentIdx].copyWith(isBlocked: true);
+              }
+            }
+
+            // If all constituent features are ON, dm_profile_only automatically activates;
+            // if any is turned OFF, dm_profile_only turns OFF.
+            final allConstituentsBlocked = constituentIds.every((id) {
+              final idx = features.indexWhere((f) => f.id == id);
+              return idx != -1 && features[idx].isBlocked;
+            });
+
+            final masterIdx = features.indexWhere((f) => f.id == 'dm_profile_only');
+            if (masterIdx != -1) {
+              features[masterIdx] = features[masterIdx].copyWith(isBlocked: allConstituentsBlocked);
+            }
+          }
+        } else if (appId == 'tiktok') {
+          const constituentIds = [
+            'disable_short_feed',
+            'disable_fyp',
+            'hide_stories',
+            'hide_explore_feeds',
+          ];
+
+          if (featureId == 'dm_profile_only') {
+            for (var i = 0; i < features.length; i++) {
+              if (constituentIds.contains(features[i].id)) {
+                features[i] = features[i].copyWith(isBlocked: targetBlocked);
+              }
+            }
+          } else {
+            final allConstituentsBlocked = constituentIds.every((id) {
+              final idx = features.indexWhere((f) => f.id == id);
+              return idx != -1 && features[idx].isBlocked;
+            });
+
+            final masterIdx = features.indexWhere((f) => f.id == 'dm_profile_only');
+            if (masterIdx != -1) {
+              features[masterIdx] = features[masterIdx].copyWith(isBlocked: allConstituentsBlocked);
+            }
+          }
+        }
+
         _apps[appIndex].featureBlocks = features;
         notifyListeners();
         FeatureBlockService.syncRules(this);

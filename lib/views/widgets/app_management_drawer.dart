@@ -434,28 +434,91 @@ class _AppManagementDrawerState extends State<AppManagementDrawer> {
     AppManagementProvider provider, bool isDark, Color primaryColor, Color cardColor,
   ) {
     final theme = Theme.of(context);
+    final isChildOption = feat.id == 'disable_friend_reels';
+    final isMasterMode = feat.id == 'dm_profile_only';
+
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 5),
+      padding: EdgeInsets.only(
+        top: 4,
+        bottom: 4,
+        left: isChildOption ? 16 : 0,
+      ),
       child: InkWell(
         onTap: () {
           HapticFeedback.lightImpact();
           provider.toggleFeatureBlock(app.id, feat.id);
         },
         borderRadius: BorderRadius.circular(12),
-        child: Padding(
-          padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 2),
+        child: Container(
+          padding: EdgeInsets.symmetric(
+            vertical: isMasterMode ? 8 : 4,
+            horizontal: isMasterMode ? 8 : 4,
+          ),
+          decoration: isMasterMode
+              ? BoxDecoration(
+                  color: isDark ? const Color(0xFF161616) : const Color(0xFFF3F3F3),
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(
+                    color: feat.isBlocked
+                        ? primaryColor.withValues(alpha: 0.4)
+                        : (isDark ? const Color(0xFF262626) : const Color(0xFFE5E5E5)),
+                  ),
+                )
+              : null,
           child: Row(
             children: [
+              if (isChildOption) ...[
+                Text(
+                  '└─ ',
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                    color: isDark ? const Color(0xFF666666) : const Color(0xFF999999),
+                  ),
+                ),
+              ],
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
-                      feat.title,
-                      style: theme.textTheme.labelLarge?.copyWith(
-                        fontSize: 12, fontWeight: FontWeight.w700,
-                      ),
+                    Row(
+                      children: [
+                        Flexible(
+                          child: Text(
+                            feat.title,
+                            style: theme.textTheme.labelLarge?.copyWith(
+                              fontSize: isMasterMode ? 13 : 12,
+                              fontWeight: isMasterMode ? FontWeight.w800 : FontWeight.w700,
+                              color: isMasterMode && feat.isBlocked ? primaryColor : null,
+                            ),
+                          ),
+                        ),
+                        if (isMasterMode) ...[
+                          const SizedBox(width: 6),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
+                            decoration: BoxDecoration(
+                              color: feat.isBlocked
+                                  ? primaryColor.withValues(alpha: 0.15)
+                                  : (isDark ? const Color(0xFF262626) : const Color(0xFFE0E0E0)),
+                              borderRadius: BorderRadius.circular(4),
+                            ),
+                            child: Text(
+                              'SEMUA FITUR',
+                              style: TextStyle(
+                                fontSize: 8.5,
+                                fontWeight: FontWeight.w800,
+                                letterSpacing: 0.4,
+                                color: feat.isBlocked
+                                    ? primaryColor
+                                    : (isDark ? const Color(0xFF888888) : const Color(0xFF777777)),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ],
                     ),
+                    const SizedBox(height: 1),
                     Text(
                       feat.description,
                       style: theme.textTheme.bodyMedium?.copyWith(

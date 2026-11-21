@@ -186,13 +186,24 @@ class LifelitAccessibilityService : AccessibilityService() {
         } else if (pkg.contains("instagram")) {
             val rules = activeRules["instagram"] ?: return
 
+            val reelsBlocked = rules.contains("disable_reels") || rules.contains("dm_profile_only")
+            val friendReelsBlocked = rules.contains("disable_friend_reels") || rules.contains("dm_profile_only")
+
             // 1. Reels Blocking (Reels tab or Reel link sent by friends in DM)
-            if (rules.contains("disable_reels") || rules.contains("disable_friend_reels") || rules.contains("dm_profile_only")) {
+            if (reelsBlocked) {
                 if (isInstagramReelsActive(root, event)) {
-                    lastNavTimestamp = now
-                    hideOverlayImmediate()
-                    handleInstagramReelsBlocked(root, rules)
-                    return
+                    val tabBars = root.findAccessibilityNodeInfosByViewId("com.instagram.android:id/tab_bar")
+                    val isNavBarReels = !tabBars.isNullOrEmpty()
+
+                    // If it is a modal Reel (from DM chat) and friendReels is NOT blocked, allow it!
+                    if (!isNavBarReels && !friendReelsBlocked) {
+                        // Reel from friend in DM: permitted
+                    } else {
+                        lastNavTimestamp = now
+                        hideOverlayImmediate()
+                        handleInstagramReelsBlocked(root, rules)
+                        return
+                    }
                 }
             }
 
@@ -584,24 +595,20 @@ class LifelitAccessibilityService : AccessibilityService() {
             return
         }
 
-        // 1. If user is in Search / Explore mode:
-        // Allowed unless strict dm_profile_only mode is active
-        if (isInstagramSearchOrExplore(root)) {
-            if (!rules.contains("dm_profile_only")) {
-                scheduleHideOverlay(150L)
-                return
-            }
+        val dmOnly = rules.contains("dm_profile_only")
+        val homeBlocked = rules.contains("disable_home") || dmOnly
+        val feedsBlocked = rules.contains("disable_feeds") || homeBlocked
+
+        // 1. DM & Profile are ALWAYS permitted!
+        if (isInstagramDM(root) || isInstagramProfile(root)) {
+            scheduleHideOverlay(150L)
+            return
         }
 
-        // 2. DM & Profile Only Mode
-        if (rules.contains("dm_profile_only")) {
-            val inDm = isInstagramDM(root)
-            val inProfile = isInstagramProfile(root)
-            if (inDm || inProfile) {
-                scheduleHideOverlay(150L)
-                return
-            } else {
-                // User is in restricted area (Feed, Explore, etc.)
+        // 2. Search / Explore Mode
+        if (isInstagramSearchOrExplore(root)) {
+            if (dmOnly) {
+                // In strict DM & Profile only mode, Explore is restricted
                 val now = System.currentTimeMillis()
                 if (now - lastNavTimestamp > NAV_COOLDOWN_MS) {
                     lastNavTimestamp = now
@@ -609,7 +616,6 @@ class LifelitAccessibilityService : AccessibilityService() {
                         clickInstagramDM(root)
                     }
                 }
-                // Show overlay while redirecting to keep feed hidden
                 cancelPendingHide()
                 val bounds = calculateInstagramFeedBounds(root)
                 overlayManager?.showFeedBlockOverlay(
@@ -621,34 +627,53 @@ class LifelitAccessibilityService : AccessibilityService() {
                     customHeightPx = bounds.heightPx
                 )
                 return
-            }
-        }
-
-        // 3. Feed / Home Blocking Mode
-        if (rules.contains("disable_feeds") || rules.contains("disable_home")) {
-            if (isInstagramDM(root) || isInstagramProfile(root)) {
+            } else {
+                // If only feeds or home are blocked, Search / Explore is 100% accessible!
                 scheduleHideOverlay(150L)
                 return
             }
+        }
 
-            val isHome = isInstagramHomeFeed(root)
-            if (isHome) {
+        // 3. Home Feed / Beranda
+        if (isInstagramHomeFeed(root)) {
+            if (homeBlocked) {
+                // Tab beranda diblokir: otomatis diarahkan ke profil / DM
+                val now = System.currentTimeMillis()
+                if (now - lastNavTimestamp > NAV_COOLDOWN_MS) {
+                    lastNavTimestamp = now
+                    if (!clickInstagramProfile(root)) {
+                        clickInstagramDM(root)
+                    }
+                }
                 cancelPendingHide()
                 val bounds = calculateInstagramFeedBounds(root)
                 overlayManager?.showFeedBlockOverlay(
                     appName = "Instagram",
-                    title = "Beranda Instagram Dibatasi",
+                    title = if (dmOnly) "Mode DM & Profil Aktif" else "Beranda Instagram Dibatasi",
+                    subtitle = if (dmOnly) "Akses hanya diizinkan untuk percakapan DM dan Profil." else "Mengalihkan ke halaman yang diizinkan...",
+                    isDark = true,
+                    customTopPx = bounds.topPx,
+                    customHeightPx = bounds.heightPx
+                )
+                return
+            } else if (feedsBlocked) {
+                // Matikan feeds: tutup scroll feeds dengan overlay menyatu
+                cancelPendingHide()
+                val bounds = calculateInstagramFeedBounds(root)
+                overlayManager?.showFeedBlockOverlay(
+                    appName = "Instagram",
+                    title = "Feeds Instagram Dibatasi",
                     subtitle = "DM, Pencarian & Profil tetap dapat diakses normal.",
                     isDark = true,
                     customTopPx = bounds.topPx,
                     customHeightPx = bounds.heightPx
                 )
-            } else {
-                scheduleHideOverlay(200L)
+                return
             }
-        } else {
-            hideOverlayImmediate()
         }
+
+        // Area lainnya yang diizinkan
+        scheduleHideOverlay(200L)
     }
 
     private fun calculateInstagramFeedBounds(root: AccessibilityNodeInfo): FeedBounds {
@@ -943,20 +968,26 @@ class LifelitAccessibilityService : AccessibilityService() {
      */
     private fun redirectToInstagramAllowedScreen(root: AccessibilityNodeInfo, rules: Set<String>) {
         val dmOnly = rules.contains("dm_profile_only")
-        val feedBlocked = rules.contains("disable_feeds") || rules.contains("disable_home")
+        val homeBlocked = rules.contains("disable_home") || dmOnly
+        val feedsBlocked = rules.contains("disable_feeds") || homeBlocked
 
         if (dmOnly) {
             // In dm_profile_only mode, navigate to Profile tab directly
             if (!clickInstagramProfile(root)) {
                 clickInstagramDM(root)
             }
-        } else if (feedBlocked) {
-            // Feed is blocked: navigate to Profile
+        } else if (homeBlocked) {
+            // Home is blocked: navigate to Profile (or Search)
             if (!clickInstagramProfile(root)) {
                 clickInstagramSearch(root)
             }
+        } else if (feedsBlocked) {
+            // Feed is blocked: navigate to Profile if possible, else Beranda with overlay
+            if (!clickInstagramProfile(root)) {
+                clickInstagramHome(root)
+            }
         } else {
-            // Feeds are allowed: navigate to Beranda
+            // Feeds & Home are allowed: navigate to Beranda
             clickInstagramHome(root)
         }
     }
