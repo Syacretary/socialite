@@ -313,6 +313,20 @@ class SettingsScreen extends StatelessWidget {
               settings.requestAccessibilityPermission();
             },
           ),
+          const SizedBox(height: 8),
+
+          _buildPermissionTile(
+            context: context,
+            title: loc.get('permissionBattery'),
+            subtitle: loc.get('permissionBatteryDesc'),
+            isActive: settings.batteryOptimizationIgnored,
+            isDark: isDark,
+            primaryColor: primaryColor,
+            onToggle: () {
+              HapticFeedback.lightImpact();
+              settings.requestBatteryOptimization();
+            },
+          ),
         ],
       ),
     );

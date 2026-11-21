@@ -5,6 +5,7 @@ import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import android.os.Build
+import android.os.PowerManager
 import android.os.Process
 import android.provider.Settings
 import android.text.TextUtils
@@ -14,6 +15,8 @@ import io.flutter.plugin.common.MethodChannel
 
 class MainActivity : FlutterActivity() {
     private val CHANNEL = "com.syacretary.lifelit/features"
+    private val PREFS_CONFIG = "lifelit_app_config"
+    private val KEY_CONFIG = "app_configurations"
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
@@ -69,6 +72,58 @@ class MainActivity : FlutterActivity() {
                         }
                         startActivity(intent)
                         result.success(true)
+                    } catch (e: Exception) {
+                        result.error("ERROR", e.message, null)
+                    }
+                }
+                "isBatteryOptimizationIgnored" -> {
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                        val pm = getSystemService(Context.POWER_SERVICE) as PowerManager
+                        result.success(pm.isIgnoringBatteryOptimizations(packageName))
+                    } else {
+                        result.success(true)
+                    }
+                }
+                "requestIgnoreBatteryOptimization" -> {
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                        try {
+                            val intent = Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS).apply {
+                                data = Uri.parse("package:$packageName")
+                                flags = Intent.FLAG_ACTIVITY_NEW_TASK
+                            }
+                            startActivity(intent)
+                            result.success(true)
+                        } catch (e: Exception) {
+                            try {
+                                val fallback = Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS).apply {
+                                    flags = Intent.FLAG_ACTIVITY_NEW_TASK
+                                }
+                                startActivity(fallback)
+                                result.success(true)
+                            } catch (ex: Exception) {
+                                result.error("ERROR", ex.message, null)
+                            }
+                        }
+                    } else {
+                        result.success(true)
+                    }
+                }
+                "saveAppConfig" -> {
+                    try {
+                        val configJson = call.argument<String>("config") ?: ""
+                        val prefs = getSharedPreferences(PREFS_CONFIG, Context.MODE_PRIVATE)
+                        prefs.edit().putString(KEY_CONFIG, configJson).apply()
+                        LifelitAccessibilityService.loadLimitsFromPrefs(this)
+                        result.success(true)
+                    } catch (e: Exception) {
+                        result.error("ERROR", e.message, null)
+                    }
+                }
+                "loadAppConfig" -> {
+                    try {
+                        val prefs = getSharedPreferences(PREFS_CONFIG, Context.MODE_PRIVATE)
+                        val configJson = prefs.getString(KEY_CONFIG, null)
+                        result.success(configJson)
                     } catch (e: Exception) {
                         result.error("ERROR", e.message, null)
                     }

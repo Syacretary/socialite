@@ -51,6 +51,35 @@ class FeatureBlockService {
     } catch (_) {}
   }
 
+  static Future<bool> isBatteryOptimizationIgnored() async {
+    try {
+      final bool? ignored = await _channel.invokeMethod<bool>('isBatteryOptimizationIgnored');
+      return ignored ?? false;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  static Future<void> requestIgnoreBatteryOptimization() async {
+    try {
+      await _channel.invokeMethod('requestIgnoreBatteryOptimization');
+    } catch (_) {}
+  }
+
+  static Future<void> saveAppConfig(String jsonConfig) async {
+    try {
+      await _channel.invokeMethod('saveAppConfig', {'config': jsonConfig});
+    } catch (_) {}
+  }
+
+  static Future<String?> loadAppConfig() async {
+    try {
+      return await _channel.invokeMethod<String>('loadAppConfig');
+    } catch (_) {
+      return null;
+    }
+  }
+
   /// Syncs currently configured feature blocks from Flutter to Android AccessibilityService
   static Future<void> syncRules(AppManagementProvider provider) async {
     try {

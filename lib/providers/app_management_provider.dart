@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import '../models/app_item.dart';
 import '../services/feature_block_service.dart';
@@ -125,7 +126,66 @@ class AppManagementProvider extends ChangeNotifier {
   bool get hasCheckedInstalledApps => _hasCheckedInstalledApps;
 
   AppManagementProvider() {
+    _loadPersistentConfig();
     checkInstalledApps();
+  }
+
+  Future<void> _loadPersistentConfig() async {
+    try {
+      final raw = await FeatureBlockService.loadAppConfig();
+      if (raw == null || raw.isEmpty) return;
+      final Map<String, dynamic> configMap = jsonDecode(raw);
+
+      for (var i = 0; i < _apps.length; i++) {
+        final appId = _apps[i].id;
+        if (!configMap.containsKey(appId)) continue;
+        final appData = configMap[appId] as Map<String, dynamic>;
+
+        final isRestricted = appData['isRestricted'] as bool? ?? _apps[i].isRestricted;
+        final dailyLimitMinutes = appData['dailyLimitMinutes'] as int? ?? _apps[i].dailyLimitMinutes;
+        final actionIdx = appData['actionOnLimit'] as int? ?? _apps[i].actionOnLimit.index;
+        final actionOnLimit = LimitAction.values[actionIdx.clamp(0, LimitAction.values.length - 1)];
+
+        var features = List<AppFeatureBlock>.from(_apps[i].featureBlocks);
+        if (appData.containsKey('features')) {
+          final featMap = appData['features'] as Map<String, dynamic>;
+          for (var j = 0; j < features.length; j++) {
+            if (featMap.containsKey(features[j].id)) {
+              features[j] = features[j].copyWith(isBlocked: featMap[features[j].id] as bool);
+            }
+          }
+        }
+
+        _apps[i] = _apps[i].copyWith(
+          isRestricted: isRestricted,
+          dailyLimitMinutes: dailyLimitMinutes,
+          actionOnLimit: actionOnLimit,
+        );
+        _apps[i].featureBlocks = features;
+      }
+      notifyListeners();
+      FeatureBlockService.syncRules(this);
+    } catch (_) {}
+  }
+
+  void _savePersistentConfig() {
+    final Map<String, dynamic> configMap = {};
+    for (final app in _apps) {
+      final featMap = <String, bool>{};
+      for (final f in app.featureBlocks) {
+        featMap[f.id] = f.isBlocked;
+      }
+      configMap[app.id] = {
+        'packageName': app.packageName,
+        'isRestricted': app.isRestricted,
+        'dailyLimitMinutes': app.dailyLimitMinutes,
+        'actionOnLimit': app.actionOnLimit.index,
+        'features': featMap,
+      };
+    }
+    final jsonStr = jsonEncode(configMap);
+    FeatureBlockService.saveAppConfig(jsonStr);
+    FeatureBlockService.syncRules(this);
   }
 
   Future<void> checkInstalledApps() async {
@@ -173,6 +233,7 @@ class AppManagementProvider extends ChangeNotifier {
     if (index != -1 && !_apps[index].isRestricted) {
       _apps[index].isRestricted = true;
       notifyListeners();
+      _savePersistentConfig();
     }
   }
 
@@ -181,6 +242,7 @@ class AppManagementProvider extends ChangeNotifier {
     if (index != -1 && _apps[index].isRestricted) {
       _apps[index].isRestricted = false;
       notifyListeners();
+      _savePersistentConfig();
     }
   }
 
@@ -189,6 +251,7 @@ class AppManagementProvider extends ChangeNotifier {
     if (index != -1) {
       _apps[index].isRestricted = !_apps[index].isRestricted;
       notifyListeners();
+      _savePersistentConfig();
     }
   }
 
@@ -201,6 +264,7 @@ class AppManagementProvider extends ChangeNotifier {
       if (_apps[index].dailyLimitMinutes != clamped) {
         _apps[index].dailyLimitMinutes = clamped;
         notifyListeners();
+        _savePersistentConfig();
       }
     }
   }
@@ -211,6 +275,7 @@ class AppManagementProvider extends ChangeNotifier {
       if (_apps[index].actionOnLimit != action) {
         _apps[index].actionOnLimit = action;
         notifyListeners();
+        _savePersistentConfig();
       }
     }
   }
@@ -297,7 +362,7 @@ class AppManagementProvider extends ChangeNotifier {
 
         _apps[appIndex].featureBlocks = features;
         notifyListeners();
-        FeatureBlockService.syncRules(this);
+        _savePersistentConfig();
       }
     }
   }

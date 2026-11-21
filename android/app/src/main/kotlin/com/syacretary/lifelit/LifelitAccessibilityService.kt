@@ -1,15 +1,27 @@
 package com.syacretary.lifelit
 
 import android.accessibilityservice.AccessibilityService
+import android.app.usage.UsageStatsManager
 import android.content.Context
 import android.os.Handler
 import android.os.Looper
 import android.view.accessibility.AccessibilityEvent
+import com.syacretary.lifelit.core.AccessibilityUtils
 import com.syacretary.lifelit.core.AppFeatureHandler
 import com.syacretary.lifelit.features.instagram.InstagramHandler
 import com.syacretary.lifelit.features.tiktok.TikTokHandler
 import com.syacretary.lifelit.features.twitter.TwitterHandler
 import com.syacretary.lifelit.features.youtube.YouTubeHandler
+import org.json.JSONObject
+import java.util.Calendar
+
+data class NativeAppLimit(
+    val appId: String,
+    val packageName: String,
+    val isRestricted: Boolean,
+    val dailyLimitMinutes: Int,
+    val actionOnLimit: Int
+)
 
 /**
  * LifelitAccessibilityService
@@ -34,8 +46,11 @@ class LifelitAccessibilityService : AccessibilityService() {
 
         private const val PREFS_NAME = "lifelit_rules"
         private const val KEY_RULES  = "active_feature_rules"
+        private const val PREFS_CONFIG = "lifelit_app_config"
+        private const val KEY_CONFIG = "app_configurations"
 
         private val activeRules = mutableMapOf<String, MutableSet<String>>()
+        private val activeLimits = mutableMapOf<String, NativeAppLimit>()
 
         /**
          * Transient system packages that must NOT cause overlays to hide.
@@ -89,6 +104,29 @@ class LifelitAccessibilityService : AccessibilityService() {
                 }
             }
         }
+
+        fun loadLimitsFromPrefs(context: Context) {
+            try {
+                val prefs = context.getSharedPreferences(PREFS_CONFIG, Context.MODE_PRIVATE)
+                val raw = prefs.getString(KEY_CONFIG, null) ?: return
+                val json = JSONObject(raw)
+                activeLimits.clear()
+                val keys = json.keys()
+                while (keys.hasNext()) {
+                    val appId = keys.next()
+                    val obj = json.getJSONObject(appId)
+                    val pkg = obj.optString("packageName", "")
+                    val isRestricted = obj.optBoolean("isRestricted", false)
+                    val dailyLimit = obj.optInt("dailyLimitMinutes", 30)
+                    val action = obj.optInt("actionOnLimit", 2)
+                    if (isRestricted && pkg.isNotBlank()) {
+                        activeLimits[pkg] = NativeAppLimit(appId, pkg, isRestricted, dailyLimit, action)
+                    }
+                }
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
+        }
     }
 
     override fun onServiceConnected() {
@@ -102,6 +140,7 @@ class LifelitAccessibilityService : AccessibilityService() {
             TwitterHandler()
         )
         loadRulesFromPrefs(this)
+        loadLimitsFromPrefs(this)
     }
 
     override fun onDestroy() {
@@ -135,7 +174,24 @@ class LifelitAccessibilityService : AccessibilityService() {
 
         val handler = findHandlerForPackage(pkg)
 
-        // 3. If genuinely exiting to another user app (e.g. Launcher, Settings, WhatsApp), hide overlay
+        // 3. Native Screen Time Limit Enforcement (runs completely standalone in background)
+        val limitConfig = activeLimits[pkg]
+        if (limitConfig != null && limitConfig.isRestricted && limitConfig.dailyLimitMinutes > 0) {
+            if (isTimeLimitExceeded(pkg, limitConfig.dailyLimitMinutes)) {
+                if (limitConfig.actionOnLimit == 2) { // blockAndClose
+                    AccessibilityUtils.navigateToHome(this, this, pkg)
+                    overlayManager?.showFeedBlockOverlay(
+                        appName = limitConfig.appId.replaceFirstChar { it.uppercase() },
+                        title = "Batas Waktu Tercapai",
+                        subtitle = "Batas harian ${limitConfig.dailyLimitMinutes} menit telah habis untuk hari ini.",
+                        isDark = true
+                    )
+                    return
+                }
+            }
+        }
+
+        // 4. If genuinely exiting to another user app (e.g. Launcher, Settings, WhatsApp), hide overlay
         if (event.eventType == AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED) {
             if (handler == null) {
                 hideOverlayImmediate()
@@ -145,7 +201,7 @@ class LifelitAccessibilityService : AccessibilityService() {
 
         if (handler == null) return
 
-        // 4. Fast redirect check for Shorts / Reels / Stories / Home
+        // 5. Fast redirect check for Shorts / Reels / Stories / Home
         val root = rootInActiveWindow
         if (root != null) {
             val rules = getRulesForPackage(pkg)
@@ -158,8 +214,26 @@ class LifelitAccessibilityService : AccessibilityService() {
             }
         }
 
-        // 5. Debounced layout and state evaluation
+        // 6. Debounced layout and state evaluation
         scheduleEvaluation(100L)
+    }
+
+    private fun isTimeLimitExceeded(pkg: String, limitMinutes: Int): Boolean {
+        try {
+            val usm = getSystemService(Context.USAGE_STATS_SERVICE) as? UsageStatsManager ?: return false
+            val cal = Calendar.getInstance().apply {
+                set(Calendar.HOUR_OF_DAY, 0)
+                set(Calendar.MINUTE, 0)
+                set(Calendar.SECOND, 0)
+                set(Calendar.MILLISECOND, 0)
+            }
+            val stats = usm.queryUsageStats(UsageStatsManager.INTERVAL_DAILY, cal.timeInMillis, System.currentTimeMillis())
+            val appStat = stats?.firstOrNull { it.packageName == pkg } ?: return false
+            val usedMinutes = appStat.totalTimeInForeground / (1000 * 60)
+            return usedMinutes >= limitMinutes
+        } catch (e: Exception) {
+            return false
+        }
     }
 
     private fun findHandlerForPackage(pkg: String): AppFeatureHandler? {
