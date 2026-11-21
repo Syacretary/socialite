@@ -153,12 +153,27 @@ class ManageAppScreen extends StatelessWidget {
               const SizedBox(height: 10),
 
               // Content of restricted zone
-              if (provider.restrictedApps.isEmpty)
+              if (provider.allApps.isEmpty)
+                Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                  child: Center(
+                    child: Text(
+                      loc.get('noInstalledApps'),
+                      textAlign: TextAlign.center,
+                      style: theme.textTheme.bodyMedium?.copyWith(
+                        fontSize: 11,
+                        color: isDark ? const Color(0xFF666666) : const Color(0xFF999999),
+                      ),
+                    ),
+                  ),
+                )
+              else if (provider.restrictedApps.isEmpty)
                 Padding(
                   padding: const EdgeInsets.symmetric(vertical: 8),
                   child: Center(
                     child: Text(
                       loc.get('restrictedZoneEmpty').replaceAll('\n', ' '),
+                      textAlign: TextAlign.center,
                       style: theme.textTheme.bodyMedium?.copyWith(
                         fontSize: 11,
                         color: isDark ? const Color(0xFF555555) : const Color(0xFFAAAAAA),
@@ -258,13 +273,31 @@ class ManageAppScreen extends StatelessWidget {
               ),
               const SizedBox(height: 10),
 
-              if (provider.availableApps.isEmpty)
+              if (provider.allApps.isEmpty)
                 Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 8),
+                  padding: const EdgeInsets.symmetric(vertical: 12),
                   child: Center(
                     child: Text(
-                      'Semua aplikasi telah dibatasi.',
-                      style: theme.textTheme.bodyMedium?.copyWith(fontSize: 11),
+                      loc.get('noInstalledApps'),
+                      textAlign: TextAlign.center,
+                      style: theme.textTheme.bodyMedium?.copyWith(
+                        fontSize: 11,
+                        color: isDark ? const Color(0xFF666666) : const Color(0xFF999999),
+                      ),
+                    ),
+                  ),
+                )
+              else if (provider.availableApps.isEmpty)
+                Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                  child: Center(
+                    child: Text(
+                      loc.get('allAppsRestricted'),
+                      textAlign: TextAlign.center,
+                      style: theme.textTheme.bodyMedium?.copyWith(
+                        fontSize: 11,
+                        color: isDark ? const Color(0xFF666666) : const Color(0xFF999999),
+                      ),
                     ),
                   ),
                 )

@@ -383,6 +383,26 @@ class ScreentimeScreen extends StatelessWidget {
     final sortedApps = List.of(provider.allApps)
       ..sort((a, b) => b.usageMinutesToday.compareTo(a.usageMinutesToday));
 
+    if (sortedApps.isEmpty) {
+      return Container(
+        padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 16),
+        decoration: BoxDecoration(
+          color: isDark ? const Color(0xFF0A0A0A) : const Color(0xFFF3F4F6),
+          borderRadius: BorderRadius.circular(22),
+        ),
+        child: Center(
+          child: Text(
+            loc.get('noInstalledApps'),
+            textAlign: TextAlign.center,
+            style: theme.textTheme.bodyMedium?.copyWith(
+              fontSize: 11,
+              color: isDark ? const Color(0xFF666666) : const Color(0xFF999999),
+            ),
+          ),
+        ),
+      );
+    }
+
     final maxAppMinutes = sortedApps.first.usageMinutesToday;
 
     return Container(

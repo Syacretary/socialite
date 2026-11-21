@@ -33,6 +33,8 @@ class AppLocalizations {
       'activeRestrictionCount': 'Aplikasi Terkunci',
       'unrestrictedBadge': 'Bebas Akses',
       'tapToEject': 'Keluarkan',
+      'noInstalledApps': 'Tidak ada aplikasi sosial media terdeteksi di perangkat ini.',
+      'allAppsRestricted': 'Semua aplikasi terinstal telah dibatasi.',
 
       // Screentime Screen
       'screentimeTitle': 'Screentime',
@@ -101,6 +103,8 @@ class AppLocalizations {
       'activeRestrictionCount': 'Locked Apps',
       'unrestrictedBadge': 'Unrestricted',
       'tapToEject': 'Eject',
+      'noInstalledApps': 'No supported social media apps detected on this device.',
+      'allAppsRestricted': 'All installed apps have been restricted.',
 
       // Screentime Screen
       'screentimeTitle': 'Screentime',

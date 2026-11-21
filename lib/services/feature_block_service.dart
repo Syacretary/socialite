@@ -72,4 +72,19 @@ class FeatureBlockService {
       await _channel.invokeMethod('syncFeatureRules', rulesMap);
     } catch (_) {}
   }
+
+  /// Returns only the package names from [candidatePackages] that are
+  /// actually installed on the user's device.
+  static Future<List<String>> getInstalledPackages(List<String> candidatePackages) async {
+    try {
+      final result = await _channel.invokeMethod<List<dynamic>>(
+        'getInstalledPackages',
+        {'packages': candidatePackages},
+      );
+      if (result != null) {
+        return result.cast<String>();
+      }
+    } catch (_) {}
+    return candidatePackages;
+  }
 }

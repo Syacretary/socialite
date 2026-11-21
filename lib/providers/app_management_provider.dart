@@ -117,12 +117,34 @@ class AppManagementProvider extends ChangeNotifier {
   bool _isDraggingOverRestrictedZone = false;
   bool _isDraggingOverAvailableZone = false;
 
+  Set<String> _installedPackages = {};
+  bool _hasCheckedInstalledApps = false;
+
   bool get isDraggingOverRestrictedZone => _isDraggingOverRestrictedZone;
   bool get isDraggingOverAvailableZone => _isDraggingOverAvailableZone;
+  bool get hasCheckedInstalledApps => _hasCheckedInstalledApps;
 
-  List<AppItem> get allApps => List.unmodifiable(_apps);
-  List<AppItem> get restrictedApps => _apps.where((app) => app.isRestricted).toList();
-  List<AppItem> get availableApps => _apps.where((app) => !app.isRestricted).toList();
+  AppManagementProvider() {
+    checkInstalledApps();
+  }
+
+  Future<void> checkInstalledApps() async {
+    final candidatePkgs = _apps.map((a) => a.packageName).toList();
+    final installed = await FeatureBlockService.getInstalledPackages(candidatePkgs);
+    _installedPackages = installed.toSet();
+    _hasCheckedInstalledApps = true;
+    notifyListeners();
+  }
+
+  List<AppItem> get allApps {
+    if (!_hasCheckedInstalledApps) return List.unmodifiable(_apps);
+    return List.unmodifiable(
+      _apps.where((app) => _installedPackages.contains(app.packageName)),
+    );
+  }
+
+  List<AppItem> get restrictedApps => allApps.where((app) => app.isRestricted).toList();
+  List<AppItem> get availableApps => allApps.where((app) => !app.isRestricted).toList();
 
   AppItem? getAppById(String id) {
     try {

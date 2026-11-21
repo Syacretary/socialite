@@ -83,6 +83,31 @@ class MainActivity : FlutterActivity() {
                         result.error("ERROR", e.message, null)
                     }
                 }
+                "getInstalledPackages" -> {
+                    try {
+                        @Suppress("UNCHECKED_CAST")
+                        val candidates = call.argument<List<String>>("packages") ?: emptyList()
+                        val installed = mutableListOf<String>()
+                        val pm = packageManager
+                        for (pkg in candidates) {
+                            try {
+                                pm.getPackageInfo(pkg, 0)
+                                installed.add(pkg)
+                            } catch (e: Exception) {
+                                // Specific alias check (e.g. TikTok international vs SEA package)
+                                if (pkg == "com.zhiliaoapp.musically") {
+                                    try {
+                                        pm.getPackageInfo("com.ss.android.ugc.trill", 0)
+                                        installed.add(pkg)
+                                    } catch (_: Exception) {}
+                                }
+                            }
+                        }
+                        result.success(installed)
+                    } catch (e: Exception) {
+                        result.error("ERROR", e.message, null)
+                    }
+                }
                 else -> {
                     result.notImplemented()
                 }

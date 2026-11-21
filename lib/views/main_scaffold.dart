@@ -18,7 +18,7 @@ class MainScaffold extends StatefulWidget {
   State<MainScaffold> createState() => _MainScaffoldState();
 }
 
-class _MainScaffoldState extends State<MainScaffold> {
+class _MainScaffoldState extends State<MainScaffold> with WidgetsBindingObserver {
   int _currentIndex = 0;
 
   final List<Widget> _screens = const [
@@ -30,6 +30,7 @@ class _MainScaffoldState extends State<MainScaffold> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     // Start limit enforcement after first frame so context & providers are ready
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
@@ -38,11 +39,23 @@ class _MainScaffoldState extends State<MainScaffold> {
       LimitEnforcementService.instance.start(provider, context);
       FeatureBlockService.syncRules(provider);
       settings.refreshPermissions();
+      provider.checkInstalledApps();
     });
   }
 
   @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed && mounted) {
+      final provider = Provider.of<AppManagementProvider>(context, listen: false);
+      final settings = Provider.of<SettingsProvider>(context, listen: false);
+      provider.checkInstalledApps();
+      settings.refreshPermissions();
+    }
+  }
+
+  @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     LimitEnforcementService.instance.stop();
     super.dispose();
   }
