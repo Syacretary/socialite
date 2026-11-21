@@ -15,6 +15,7 @@ class AppManagementDrawer extends StatelessWidget {
     return showModalBottomSheet(
       context: context,
       isScrollControlled: true,
+      enableDrag: true,
       backgroundColor: Colors.transparent,
       barrierColor: Colors.black.withValues(alpha: 0.6),
       builder: (_) => AppManagementDrawer(appId: appId),
@@ -28,118 +29,111 @@ class AppManagementDrawer extends StatelessWidget {
     final primaryColor = isDark ? const Color(0xFFFFFFFF) : const Color(0xFF000000);
     final surfaceColor = isDark ? const Color(0xFF0D0D0D) : const Color(0xFFFFFFFF);
     final cardColor = isDark ? const Color(0xFF141414) : const Color(0xFFF3F4F6);
+    final screenHeight = MediaQuery.of(context).size.height;
 
     return Consumer<AppManagementProvider>(
       builder: (context, provider, _) {
         final app = provider.getAppById(appId);
         if (app == null) return const SizedBox.shrink();
 
-        // Native bottom sheet covering ~1/4 screen from the bottom upwards,
-        // with expandable sheet behavior so user can scroll or drag to view full options.
-        return DraggableScrollableSheet(
-          initialChildSize: 0.28,
-          minChildSize: 0.20,
-          maxChildSize: 0.85,
-          snap: true,
-          snapSizes: const [0.28, 0.55, 0.85],
-          shouldCloseOnMinExtent: true,
-          builder: (context, scrollController) {
-            return Align(
-              alignment: Alignment.bottomCenter,
-              child: ConstrainedBox(
-                constraints: const BoxConstraints(maxWidth: 600),
-                child: Container(
-                  width: double.infinity,
-                  decoration: BoxDecoration(
-                    color: surfaceColor,
-                    borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
-                  ),
-                  child: SafeArea(
-                    top: false,
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        // Grabber & Header (Drag down to dismiss)
-                        GestureDetector(
-                          behavior: HitTestBehavior.opaque,
-                          onVerticalDragEnd: (details) {
-                            if ((details.primaryVelocity ?? 0) > 200) {
-                              Navigator.of(context).pop();
-                            }
-                          },
-                          child: Column(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Container(
-                                margin: const EdgeInsets.only(top: 10, bottom: 6),
-                                width: 36,
-                                height: 4,
-                                decoration: BoxDecoration(
-                                  color: isDark ? const Color(0xFF333333) : const Color(0xFFD4D4D4),
-                                  borderRadius: BorderRadius.circular(4),
-                                ),
-                              ),
-                              Padding(
-                                padding: const EdgeInsets.fromLTRB(18, 4, 18, 6),
-                                child: _buildAppHeader(context, app, provider, isDark, primaryColor),
-                              ),
-                            ],
+        // Langsung menutupi 3/4 layar atau lebih (~80%) dari dasar layar ke atas (Bukan floating window)
+        return Align(
+          alignment: Alignment.bottomCenter,
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 600),
+            child: Container(
+              height: screenHeight * 0.80,
+              width: double.infinity,
+              decoration: BoxDecoration(
+                color: surfaceColor,
+                borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+              ),
+              child: SafeArea(
+                top: false,
+                child: Column(
+                  children: [
+                    // Grabber indicator & Header (swipe down to dismiss)
+                    GestureDetector(
+                      behavior: HitTestBehavior.opaque,
+                      onVerticalDragEnd: (details) {
+                        if ((details.primaryVelocity ?? 0) > 180) {
+                          Navigator.of(context).pop();
+                        }
+                      },
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Container(
+                            margin: const EdgeInsets.only(top: 10, bottom: 6),
+                            width: 36,
+                            height: 4,
+                            decoration: BoxDecoration(
+                              color: isDark ? const Color(0xFF333333) : const Color(0xFFD4D4D4),
+                              borderRadius: BorderRadius.circular(4),
+                            ),
                           ),
-                        ),
+                          Padding(
+                            padding: const EdgeInsets.fromLTRB(18, 4, 18, 8),
+                            child: _buildAppHeader(context, app, provider, isDark, primaryColor),
+                          ),
+                        ],
+                      ),
+                    ),
 
-                        // Scrollable Configuration Body (All Auto-Saved)
-                        Expanded(
-                          child: ListView(
-                            controller: scrollController,
-                            padding: const EdgeInsets.fromLTRB(16, 4, 16, 20),
-                            children: [
-                              // SECTION 1: BATAS DURASI HARIAN (Recommended & Custom)
-                              _buildDurationSection(context, app, provider, isDark, primaryColor, cardColor),
+                    // Scrollable configuration content
+                    Expanded(
+                      child: SingleChildScrollView(
+                        physics: const BouncingScrollPhysics(),
+                        padding: const EdgeInsets.fromLTRB(16, 2, 16, 20),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            // SECTION 1: BATAS DURASI HARIAN (Recommended & Custom)
+                            _buildDurationSection(context, app, provider, isDark, primaryColor, cardColor),
 
-                              const SizedBox(height: 12),
+                            const SizedBox(height: 12),
 
-                              // SECTION 2: AKSI KETIKA BATAS TERCAPAI
-                              _buildActionSection(context, app, provider, isDark, primaryColor, cardColor),
+                            // SECTION 2: AKSI KETIKA BATAS TERCAPAI
+                            _buildActionSection(context, app, provider, isDark, primaryColor, cardColor),
 
-                              const SizedBox(height: 12),
+                            const SizedBox(height: 12),
 
-                              // SECTION 3: BLOKIR FITUR SPESIFIK APLIKASI
-                              _buildFeatureBlockSection(context, app, provider, isDark, primaryColor, cardColor),
+                            // SECTION 3: BLOKIR FITUR SPESIFIK APLIKASI
+                            _buildFeatureBlockSection(context, app, provider, isDark, primaryColor, cardColor),
 
-                              const SizedBox(height: 16),
+                            const SizedBox(height: 16),
 
-                              // AUTO-SAVED NOTIFICATION
-                              Center(
-                                child: Row(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    Icon(
-                                      Icons.check_circle_outline_rounded,
-                                      size: 13,
+                            // AUTO-SAVED NOTIFICATION
+                            Center(
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Icon(
+                                    Icons.check_circle_outline_rounded,
+                                    size: 13,
+                                    color: isDark ? const Color(0xFF777777) : const Color(0xFF888888),
+                                  ),
+                                  const SizedBox(width: 6),
+                                  Text(
+                                    'Setelan otomatis tersimpan',
+                                    style: theme.textTheme.bodyMedium?.copyWith(
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.w500,
                                       color: isDark ? const Color(0xFF777777) : const Color(0xFF888888),
                                     ),
-                                    const SizedBox(width: 6),
-                                    Text(
-                                      'Setelan otomatis tersimpan',
-                                      style: theme.textTheme.bodyMedium?.copyWith(
-                                        fontSize: 11,
-                                        fontWeight: FontWeight.w500,
-                                        color: isDark ? const Color(0xFF777777) : const Color(0xFF888888),
-                                      ),
-                                    ),
-                                  ],
-                                ),
+                                  ),
+                                ],
                               ),
-                            ],
-                          ),
+                            ),
+                          ],
                         ),
-                      ],
+                      ),
                     ),
-                  ),
+                  ],
                 ),
               ),
-            );
-          },
+            ),
+          ),
         );
       },
     );
