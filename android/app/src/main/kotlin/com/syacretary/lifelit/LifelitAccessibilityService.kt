@@ -593,6 +593,25 @@ class LifelitAccessibilityService : AccessibilityService() {
     }
 
     // ── 2. Instagram Evaluator ───────────────────────────────────────────────
+    //
+    // Instagram tab semantics (from live device ADB dump):
+    //   feed_tab    = Beranda (Home: posts from people you follow)
+    //   clips_tab   = Reels
+    //   direct_tab  = DM (Messages)
+    //   search_tab  = Explore/Search (discover grid + search bar)
+    //   profile_tab = Profile
+    //
+    // IMPORTANT: Instagram does NOT offset off-screen tabs to negative coordinates.
+    // All tab content lives at 0,0-1080,2130 regardless of which tab is active.
+    // Therefore, the ONLY reliable way to know which tab is active is:
+    //   getActiveInstagramTab(root) which reads the .isSelected flag on tab_bar children.
+    //
+    // Rule semantics (as clarified by user):
+    //   disable_home  = Matikan Beranda   => redirect away from Beranda tab (NO overlay, just navigate)
+    //   disable_feeds = Matikan Feeds     => on Search/Explore tab, show overlay BELOW search bar
+    //                                        (search bar stays accessible, only explore grid covered)
+    //   dm_profile_only                   => only DM + Profile allowed; everything else blocked
+    //
     private fun evaluateInstagram(root: AccessibilityNodeInfo) {
         val rules = activeRules["instagram"] ?: emptySet()
         if (rules.isEmpty()) {
@@ -602,24 +621,53 @@ class LifelitAccessibilityService : AccessibilityService() {
 
         val dmOnly = rules.contains("dm_profile_only")
         val homeBlocked = rules.contains("disable_home") || dmOnly
-        val feedsBlocked = rules.contains("disable_feeds") || homeBlocked
+        val feedsBlocked = rules.contains("disable_feeds") || dmOnly
 
         // 1. DM & Profile are ALWAYS permitted!
+        val activeTab = getActiveInstagramTab(root)
+
+        if (activeTab == "dm" || activeTab == "profile") {
+            scheduleHideOverlay(150L)
+            return
+        }
+        // Also handle sub-pages inside DM or Profile (e.g. inside a conversation)
         if (isInstagramDM(root) || isInstagramProfile(root)) {
             scheduleHideOverlay(150L)
             return
         }
 
-        // 2. Search / Explore Mode
-        if (isInstagramSearchOrExplore(root)) {
-            if (dmOnly) {
-                // In strict DM & Profile only mode, Explore is restricted
+        // 2. Beranda / Home Feed tab
+        if (activeTab == "home") {
+            if (homeBlocked) {
+                // REDIRECT ONLY - no overlay! Beranda completely blocked.
+                // User must be taken to DM or Profile, NOT shown an overlay.
                 val now = System.currentTimeMillis()
                 if (now - lastNavTimestamp > NAV_COOLDOWN_MS) {
                     lastNavTimestamp = now
-                    if (!clickInstagramProfile(root)) {
-                        clickInstagramDM(root)
+                    if (dmOnly) {
+                        // dm_profile_only: go to DM first, then Profile
+                        if (!clickInstagramDM(root)) clickInstagramProfile(root)
+                    } else {
+                        // disable_home: go to Profile, fallback to DM
+                        if (!clickInstagramProfile(root)) clickInstagramDM(root)
                     }
+                }
+                scheduleHideOverlay(150L)
+                return
+            }
+            // Home not blocked: hide overlay
+            scheduleHideOverlay(150L)
+            return
+        }
+
+        // 3. Search / Explore tab
+        if (activeTab == "search") {
+            if (dmOnly) {
+                // dm_profile_only: redirect away from Search entirely
+                val now = System.currentTimeMillis()
+                if (now - lastNavTimestamp > NAV_COOLDOWN_MS) {
+                    lastNavTimestamp = now
+                    if (!clickInstagramDM(root)) clickInstagramProfile(root)
                 }
                 cancelPendingHide()
                 val bounds = calculateInstagramFeedBounds(root)
@@ -632,53 +680,79 @@ class LifelitAccessibilityService : AccessibilityService() {
                     customHeightPx = bounds.heightPx
                 )
                 return
-            } else {
-                // If only feeds or home are blocked, Search / Explore is 100% accessible!
-                scheduleHideOverlay(150L)
-                return
             }
-        }
-
-        // 3. Home Feed / Beranda
-        if (isInstagramHomeFeed(root)) {
-            if (homeBlocked) {
-                // Tab beranda diblokir: otomatis diarahkan ke profil / DM
-                val now = System.currentTimeMillis()
-                if (now - lastNavTimestamp > NAV_COOLDOWN_MS) {
-                    lastNavTimestamp = now
-                    if (!clickInstagramProfile(root)) {
-                        clickInstagramDM(root)
-                    }
-                }
+            if (feedsBlocked) {
+                // disable_feeds: show overlay ONLY over the explore content grid.
+                // The search bar (explore_action_bar, ~143px tall) must remain accessible.
                 cancelPendingHide()
-                val bounds = calculateInstagramFeedBounds(root)
-                overlayManager?.showFeedBlockOverlay(
-                    appName = "Instagram",
-                    title = if (dmOnly) "Mode DM & Profil Aktif" else "Beranda Instagram Dibatasi",
-                    subtitle = if (dmOnly) "Akses hanya diizinkan untuk percakapan DM dan Profil." else "Mengalihkan ke halaman yang diizinkan...",
-                    isDark = true,
-                    customTopPx = bounds.topPx,
-                    customHeightPx = bounds.heightPx
-                )
-                return
-            } else if (feedsBlocked) {
-                // Matikan feeds: tutup scroll feeds dengan overlay menyatu
-                cancelPendingHide()
-                val bounds = calculateInstagramFeedBounds(root)
+                val bounds = calculateInstagramExploreBounds(root)
                 overlayManager?.showFeedBlockOverlay(
                     appName = "Instagram",
                     title = "Feeds Instagram Dibatasi",
-                    subtitle = "DM, Pencarian & Profil tetap dapat diakses normal.",
+                    subtitle = "Gunakan kolom pencarian di atas untuk mencari konten.",
                     isDark = true,
                     customTopPx = bounds.topPx,
                     customHeightPx = bounds.heightPx
                 )
                 return
             }
+            // Search/Explore not blocked
+            scheduleHideOverlay(150L)
+            return
         }
 
-        // Area lainnya yang diizinkan
+        // 4. Reels tab: handled by checkFastRedirects; here just hide overlay
+        if (activeTab == "reels") {
+            scheduleHideOverlay(150L)
+            return
+        }
+
+        // 5. Unknown tab or sub-page: permit
         scheduleHideOverlay(200L)
+    }
+
+    /**
+     * Returns which of Instagram's 5 bottom nav tabs is currently selected.
+     * Uses the actual .isSelected flag on tab children - the ONLY reliable signal
+     * since Instagram does NOT offset off-screen tab content to negative coordinates.
+     *
+     * Returns: "home", "reels", "dm", "search", "profile", or "unknown"
+     */
+    private fun getActiveInstagramTab(root: AccessibilityNodeInfo): String {
+        val tabBar = root.findAccessibilityNodeInfosByViewId("com.instagram.android:id/tab_bar")
+        if (!tabBar.isNullOrEmpty()) {
+            for (childIdx in 0 until tabBar[0].childCount) {
+                val child = tabBar[0].getChild(childIdx) ?: continue
+                if (child.isSelected) {
+                    val resId = child.viewIdResourceName ?: ""
+                    return when {
+                        resId.contains("feed_tab") -> "home"
+                        resId.contains("clips_tab") -> "reels"
+                        resId.contains("direct_tab") -> "dm"
+                        resId.contains("search_tab") -> "search"
+                        resId.contains("profile_tab") -> "profile"
+                        else -> "unknown"
+                    }
+                }
+            }
+        }
+        // Fallback: check individual tab IDs
+        val tabIds = mapOf(
+            "com.instagram.android:id/feed_tab" to "home",
+            "com.instagram.android:id/clips_tab" to "reels",
+            "com.instagram.android:id/direct_tab" to "dm",
+            "com.instagram.android:id/search_tab" to "search",
+            "com.instagram.android:id/profile_tab" to "profile"
+        )
+        for ((id, name) in tabIds) {
+            val nodes = root.findAccessibilityNodeInfosByViewId(id)
+            if (!nodes.isNullOrEmpty()) {
+                for (n in nodes) {
+                    if (n.isSelected) return name
+                }
+            }
+        }
+        return "unknown"
     }
 
     private fun calculateInstagramFeedBounds(root: AccessibilityNodeInfo): FeedBounds {
@@ -717,6 +791,63 @@ class LifelitAccessibilityService : AccessibilityService() {
 
         val heightPx = (bottomPx - topPx).coerceAtLeast((100 * dm.density).toInt())
         return FeedBounds(topPx, heightPx)
+    }
+
+    /**
+     * Calculates overlay bounds for the Search/Explore tab.
+     * The search bar (explore_action_bar, confirmed 143px tall) MUST remain accessible.
+     * The overlay starts BELOW the search bar and extends to the tab_bar top.
+     */
+    private fun calculateInstagramExploreBounds(root: AccessibilityNodeInfo): FeedBounds {
+        val dm = resources.displayMetrics
+        val screenHeight = dm.heightPixels
+        var searchBarBottom = 0
+        var bottomPx = screenHeight
+
+        // Find the explore action bar's bottom edge (the search bar)
+        val exploreActionBar = root.findAccessibilityNodeInfosByViewId("com.instagram.android:id/explore_action_bar")
+        if (!exploreActionBar.isNullOrEmpty()) {
+            val rect = Rect()
+            exploreActionBar[0].getBoundsInScreen(rect)
+            if (rect.bottom > 0) searchBarBottom = rect.bottom
+        }
+
+        // Also try the main_feed_action_bar as fallback
+        if (searchBarBottom == 0) {
+            val feedActionBar = root.findAccessibilityNodeInfosByViewId("com.instagram.android:id/main_feed_action_bar")
+            if (!feedActionBar.isNullOrEmpty()) {
+                val rect = Rect()
+                feedActionBar[0].getBoundsInScreen(rect)
+                if (rect.bottom > 0) searchBarBottom = rect.bottom
+            }
+        }
+
+        // tab_bar bottom boundary
+        val tabBars = root.findAccessibilityNodeInfosByViewId("com.instagram.android:id/tab_bar")
+        if (!tabBars.isNullOrEmpty()) {
+            val rect = Rect()
+            tabBars[0].getBoundsInScreen(rect)
+            if (rect.top > searchBarBottom) bottomPx = rect.top
+        }
+
+        // Fallback: explore_action_bar is confirmed 143px tall at y=0 on this device
+        // layout_container_main_panel starts at 107px, so action bar ends at 107+143=250px
+        if (searchBarBottom == 0) {
+            val panelNodes = root.findAccessibilityNodeInfosByViewId("com.instagram.android:id/layout_container_main_panel")
+            if (!panelNodes.isNullOrEmpty()) {
+                val rect = Rect()
+                panelNodes[0].getBoundsInScreen(rect)
+                // Search bar is ~143px tall within the content area
+                searchBarBottom = rect.top + (143 * dm.density).toInt()
+            } else {
+                searchBarBottom = (dm.heightPixels * 0.104f).toInt() // ~250px on 2400px screen
+            }
+        }
+
+        if (bottomPx == screenHeight) bottomPx = (dm.heightPixels * 0.887f).toInt()
+
+        val heightPx = (bottomPx - searchBarBottom).coerceAtLeast((100 * dm.density).toInt())
+        return FeedBounds(searchBarBottom, heightPx)
     }
 
     private fun isNodeVisibleOnScreen(node: AccessibilityNodeInfo): Boolean {
