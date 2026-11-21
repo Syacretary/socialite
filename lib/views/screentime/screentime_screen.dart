@@ -37,35 +37,35 @@ class ScreentimeScreen extends StatelessWidget {
             constraints: const BoxConstraints(maxWidth: 680),
             child: Column(
               children: [
-                // Clean Header without subtitle and without trailing chips
+                // Clean Header
                 CustomHeader(title: loc.get('screentimeTitle')),
 
-                // Feather scroll wrapper ensures content gracefully fades away before header
+                // Feather scroll wrapper with stable native scroll
                 Expanded(
                   child: FeatherScrollWrapper(
                     child: SingleChildScrollView(
-                      physics: const BouncingScrollPhysics(),
-                      padding: const EdgeInsets.fromLTRB(16, 4, 16, 120),
+                      physics: const AlwaysScrollableScrollPhysics(),
+                      padding: const EdgeInsets.fromLTRB(16, 2, 16, 80),
                       child: Column(
                         mainAxisSize: MainAxisSize.min, // Hug content tightly
                         crossAxisAlignment: CrossAxisAlignment.stretch,
                         children: [
-                          // PERMISSION CARD (If needed)
+                          // PERMISSION CARD
                           _buildPermissionBanner(context, loc, isDark, screentimeProvider, settings, primaryColor),
 
                           const SizedBox(height: 10),
 
-                          // HERO STAT CARD (Compact, No Outlines)
+                          // HERO STAT CARD
                           _buildHeroStatCard(context, loc, isDark, totalFormatted, totalMinutes, primaryColor),
 
-                          const SizedBox(height: 12),
+                          const SizedBox(height: 10),
 
-                          // WEEKLY 7-DAY MINI BAR CHART (Compact, No Outlines)
+                          // WEEKLY 7-DAY MINI BAR CHART
                           _buildWeeklyTrendCard(context, loc, isDark, screentimeProvider, primaryColor),
 
-                          const SizedBox(height: 12),
+                          const SizedBox(height: 10),
 
-                          // BREAKDOWN APPS LIST (Authentic App Logos, No Outlines)
+                          // BREAKDOWN APPS LIST
                           _buildAppBreakdownList(context, loc, isDark, appsProvider, totalMinutes, primaryColor),
                         ],
                       ),
@@ -97,7 +97,6 @@ class ScreentimeScreen extends StatelessWidget {
         decoration: BoxDecoration(
           color: isDark ? const Color(0xFF0F0F0F) : const Color(0xFFF1F2F4),
           borderRadius: BorderRadius.circular(16),
-          // NO OUTLINES
         ),
         child: Row(
           children: [
@@ -136,7 +135,6 @@ class ScreentimeScreen extends StatelessWidget {
       decoration: BoxDecoration(
         color: isDark ? const Color(0xFF141414) : const Color(0xFFEBEBEB),
         borderRadius: BorderRadius.circular(20),
-        // NO OUTLINES
       ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -202,11 +200,10 @@ class ScreentimeScreen extends StatelessWidget {
     final ratio = (totalMinutes / 360).clamp(0.0, 1.0);
 
     return Container(
-      padding: const EdgeInsets.symmetric(vertical: 18, horizontal: 18),
+      padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 16),
       decoration: BoxDecoration(
         color: isDark ? const Color(0xFF0A0A0A) : const Color(0xFFF3F4F6),
-        borderRadius: BorderRadius.circular(24),
-        // NO OUTLINES
+        borderRadius: BorderRadius.circular(22),
       ),
       child: Column(
         mainAxisSize: MainAxisSize.min, // Hug content
@@ -239,7 +236,7 @@ class ScreentimeScreen extends StatelessWidget {
               ),
             ],
           ),
-          const SizedBox(height: 8),
+          const SizedBox(height: 6),
 
           FittedBox(
             fit: BoxFit.scaleDown,
@@ -247,20 +244,20 @@ class ScreentimeScreen extends StatelessWidget {
             child: Text(
               totalFormatted,
               style: theme.textTheme.displayLarge?.copyWith(
-                fontSize: 48,
+                fontSize: 44,
                 fontWeight: FontWeight.w900,
                 letterSpacing: -2.0,
                 height: 1.0,
               ),
             ),
           ),
-          const SizedBox(height: 14),
+          const SizedBox(height: 12),
 
           // Track
           ClipRRect(
             borderRadius: BorderRadius.circular(10),
             child: Container(
-              height: 5,
+              height: 4,
               width: double.infinity,
               color: isDark ? const Color(0xFF1E1E1E) : const Color(0xFFE2E4E8),
               child: FractionallySizedBox(
@@ -270,7 +267,7 @@ class ScreentimeScreen extends StatelessWidget {
               ),
             ),
           ),
-          const SizedBox(height: 8),
+          const SizedBox(height: 6),
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
@@ -304,11 +301,10 @@ class ScreentimeScreen extends StatelessWidget {
     final days = provider.weeklyTrend;
 
     return Container(
-      padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 16),
+      padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 14),
       decoration: BoxDecoration(
         color: isDark ? const Color(0xFF0A0A0A) : const Color(0xFFF3F4F6),
-        borderRadius: BorderRadius.circular(22),
-        // NO OUTLINES
+        borderRadius: BorderRadius.circular(20),
       ),
       child: Column(
         mainAxisSize: MainAxisSize.min, // Hug content
@@ -328,9 +324,9 @@ class ScreentimeScreen extends StatelessWidget {
               Icon(Icons.bar_chart_rounded, size: 14, color: primaryColor),
             ],
           ),
-          const SizedBox(height: 14),
+          const SizedBox(height: 10),
           SizedBox(
-            height: 75, // Compact vertical size
+            height: 65, // Compact vertical size
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceEvenly,
               crossAxisAlignment: CrossAxisAlignment.end,
@@ -344,20 +340,20 @@ class ScreentimeScreen extends StatelessWidget {
                     mainAxisAlignment: MainAxisAlignment.end,
                     children: [
                       Container(
-                        width: 18,
-                        height: (50 * day.ratioOfMax).clamp(10.0, 50.0),
+                        width: 16,
+                        height: (45 * day.ratioOfMax).clamp(8.0, 45.0),
                         decoration: BoxDecoration(
                           color: isToday
                               ? primaryColor
                               : (isDark ? const Color(0xFF222222) : const Color(0xFFDDDDDD)),
-                          borderRadius: BorderRadius.circular(6),
+                          borderRadius: BorderRadius.circular(5),
                         ),
                       ),
-                      const SizedBox(height: 6),
+                      const SizedBox(height: 4),
                       Text(
                         day.dayName,
                         style: theme.textTheme.labelLarge?.copyWith(
-                          fontSize: 10,
+                          fontSize: 9,
                           fontWeight: isToday ? FontWeight.w800 : FontWeight.w500,
                           color: isToday
                               ? primaryColor
@@ -390,11 +386,10 @@ class ScreentimeScreen extends StatelessWidget {
     final maxAppMinutes = sortedApps.first.usageMinutesToday;
 
     return Container(
-      padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 16),
+      padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 14),
       decoration: BoxDecoration(
         color: isDark ? const Color(0xFF0A0A0A) : const Color(0xFFF3F4F6),
-        borderRadius: BorderRadius.circular(24),
-        // NO OUTLINES
+        borderRadius: BorderRadius.circular(22),
       ),
       child: Column(
         mainAxisSize: MainAxisSize.min, // Hug content
@@ -408,12 +403,12 @@ class ScreentimeScreen extends StatelessWidget {
               fontWeight: FontWeight.w800,
             ),
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: 10),
           ListView.separated(
             shrinkWrap: true,
             physics: const NeverScrollableScrollPhysics(),
             itemCount: sortedApps.length,
-            separatorBuilder: (_, __) => const SizedBox(height: 10),
+            separatorBuilder: (_, __) => const SizedBox(height: 8),
             itemBuilder: (context, index) {
               final app = sortedApps[index];
               final ratio = maxAppMinutes > 0 ? (app.usageMinutesToday / maxAppMinutes) : 0.0;
@@ -427,20 +422,19 @@ class ScreentimeScreen extends StatelessWidget {
                     onToggleRestriction: () => provider.toggleRestriction(app.id),
                   );
                 },
-                borderRadius: BorderRadius.circular(14),
+                borderRadius: BorderRadius.circular(12),
                 child: Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 3),
+                  padding: const EdgeInsets.symmetric(vertical: 2),
                   child: Row(
                     children: [
-                      // Authentic Brand Logo
                       SizedBox(
-                        width: 32,
-                        height: 32,
+                        width: 28,
+                        height: 28,
                         child: Center(
-                          child: app.buildLogo(size: 26),
+                          child: app.buildLogo(size: 24),
                         ),
                       ),
-                      const SizedBox(width: 12),
+                      const SizedBox(width: 10),
                       Expanded(
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
@@ -487,7 +481,7 @@ class ScreentimeScreen extends StatelessWidget {
                                 ),
                               ],
                             ),
-                            const SizedBox(height: 5),
+                            const SizedBox(height: 4),
                             ClipRRect(
                               borderRadius: BorderRadius.circular(4),
                               child: Container(

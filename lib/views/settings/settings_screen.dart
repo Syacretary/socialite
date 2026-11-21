@@ -27,33 +27,33 @@ class SettingsScreen extends StatelessWidget {
             constraints: const BoxConstraints(maxWidth: 680),
             child: Column(
               children: [
-                // Clean Header without subtitle
+                // Clean Header
                 CustomHeader(title: loc.get('settingsTitle')),
 
-                // Feather scroll wrapper
+                // Feather scroll wrapper with stable native scroll
                 Expanded(
                   child: FeatherScrollWrapper(
                     child: SingleChildScrollView(
-                      physics: const BouncingScrollPhysics(),
-                      padding: const EdgeInsets.fromLTRB(16, 4, 16, 120),
+                      physics: const AlwaysScrollableScrollPhysics(),
+                      padding: const EdgeInsets.fromLTRB(16, 2, 16, 80),
                       child: Column(
                         mainAxisSize: MainAxisSize.min, // Hug content
                         crossAxisAlignment: CrossAxisAlignment.stretch,
                         children: [
-                          // LANGUAGE SELECTOR (No Outlines, No Emojis)
+                          // LANGUAGE SELECTOR
                           _buildLanguageSection(context, loc, isDark, settings, primaryColor),
 
-                          const SizedBox(height: 12),
+                          const SizedBox(height: 10),
 
-                          // THEME SELECTOR (No Outlines, No Emojis)
+                          // THEME SELECTOR
                           _buildThemeSection(context, loc, isDark, settings, primaryColor),
 
-                          const SizedBox(height: 12),
+                          const SizedBox(height: 10),
 
-                          // PERMISSIONS SECTION (No Outlines)
+                          // PERMISSIONS SECTION
                           _buildPermissionsSection(context, loc, isDark, settings, screentime, primaryColor),
 
-                          const SizedBox(height: 12),
+                          const SizedBox(height: 10),
 
                           // ABOUT & VERSION
                           _buildAboutSection(context, loc, isDark, primaryColor),
@@ -80,11 +80,10 @@ class SettingsScreen extends StatelessWidget {
     final theme = Theme.of(context);
 
     return Container(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
         color: isDark ? const Color(0xFF0A0A0A) : const Color(0xFFF3F4F6),
-        borderRadius: BorderRadius.circular(24),
-        // NO OUTLINES
+        borderRadius: BorderRadius.circular(20),
       ),
       child: Column(
         mainAxisSize: MainAxisSize.min,
@@ -92,7 +91,7 @@ class SettingsScreen extends StatelessWidget {
         children: [
           Row(
             children: [
-              Icon(Icons.language_rounded, size: 16, color: primaryColor),
+              Icon(Icons.language_rounded, size: 15, color: primaryColor),
               const SizedBox(width: 8),
               Text(
                 loc.get('languageSection'),
@@ -104,7 +103,7 @@ class SettingsScreen extends StatelessWidget {
               ),
             ],
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: 10),
 
           Row(
             children: [
@@ -154,11 +153,10 @@ class SettingsScreen extends StatelessWidget {
     final theme = Theme.of(context);
 
     return Container(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
         color: isDark ? const Color(0xFF0A0A0A) : const Color(0xFFF3F4F6),
-        borderRadius: BorderRadius.circular(24),
-        // NO OUTLINES
+        borderRadius: BorderRadius.circular(20),
       ),
       child: Column(
         mainAxisSize: MainAxisSize.min,
@@ -166,7 +164,7 @@ class SettingsScreen extends StatelessWidget {
         children: [
           Row(
             children: [
-              Icon(Icons.contrast_rounded, size: 16, color: primaryColor),
+              Icon(Icons.contrast_rounded, size: 15, color: primaryColor),
               const SizedBox(width: 8),
               Text(
                 loc.get('themeSection'),
@@ -178,7 +176,7 @@ class SettingsScreen extends StatelessWidget {
               ),
             ],
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: 10),
 
           Row(
             children: [
@@ -230,11 +228,10 @@ class SettingsScreen extends StatelessWidget {
     final isUsageActive = settings.usagePermissionGranted || screentime.hasUsagePermission;
 
     return Container(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
         color: isDark ? const Color(0xFF0A0A0A) : const Color(0xFFF3F4F6),
-        borderRadius: BorderRadius.circular(24),
-        // NO OUTLINES
+        borderRadius: BorderRadius.circular(20),
       ),
       child: Column(
         mainAxisSize: MainAxisSize.min,
@@ -242,7 +239,7 @@ class SettingsScreen extends StatelessWidget {
         children: [
           Row(
             children: [
-              Icon(Icons.shield_outlined, size: 16, color: primaryColor),
+              Icon(Icons.shield_outlined, size: 15, color: primaryColor),
               const SizedBox(width: 8),
               Text(
                 loc.get('permissionsSection'),
@@ -254,7 +251,7 @@ class SettingsScreen extends StatelessWidget {
               ),
             ],
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: 10),
 
           _buildPermissionTile(
             context: context,
@@ -274,7 +271,7 @@ class SettingsScreen extends StatelessWidget {
               }
             },
           ),
-          const SizedBox(height: 10),
+          const SizedBox(height: 8),
 
           _buildPermissionTile(
             context: context,
@@ -288,7 +285,7 @@ class SettingsScreen extends StatelessWidget {
               settings.toggleNotificationPermission();
             },
           ),
-          const SizedBox(height: 10),
+          const SizedBox(height: 8),
 
           _buildPermissionTile(
             context: context,
@@ -320,9 +317,9 @@ class SettingsScreen extends StatelessWidget {
 
     return InkWell(
       onTap: onToggle,
-      borderRadius: BorderRadius.circular(14),
+      borderRadius: BorderRadius.circular(12),
       child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 4),
+        padding: const EdgeInsets.symmetric(vertical: 3),
         child: Row(
           children: [
             Expanded(
@@ -344,12 +341,12 @@ class SettingsScreen extends StatelessWidget {
               ),
             ),
             Container(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
               decoration: BoxDecoration(
                 color: isActive
                     ? primaryColor
                     : (isDark ? const Color(0xFF1E1E1E) : const Color(0xFFE2E4E8)),
-                borderRadius: BorderRadius.circular(10),
+                borderRadius: BorderRadius.circular(8),
               ),
               child: Text(
                 isActive ? 'AKTIF' : 'OFF',
@@ -382,13 +379,12 @@ class SettingsScreen extends StatelessWidget {
       onTap: onTap,
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 180),
-        padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 10),
+        padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 8),
         decoration: BoxDecoration(
           color: isSelected
               ? primaryColor
               : (isDark ? const Color(0xFF141414) : const Color(0xFFFFFFFF)),
-          borderRadius: BorderRadius.circular(16),
-          // NO OUTLINES
+          borderRadius: BorderRadius.circular(14),
         ),
         child: Column(
           children: [
@@ -403,11 +399,11 @@ class SettingsScreen extends StatelessWidget {
                     : primaryColor,
               ),
             ),
-            const SizedBox(height: 2),
+            const SizedBox(height: 1),
             Text(
               label,
               style: TextStyle(
-                fontSize: 10,
+                fontSize: 9,
                 fontWeight: isSelected ? FontWeight.w800 : FontWeight.w500,
                 color: isSelected
                     ? (isDark ? const Color(0xFF000000) : const Color(0xFFFFFFFF))
@@ -429,16 +425,15 @@ class SettingsScreen extends StatelessWidget {
     final theme = Theme.of(context);
 
     return Container(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
         color: isDark ? const Color(0xFF0A0A0A) : const Color(0xFFF3F4F6),
-        borderRadius: BorderRadius.circular(24),
-        // NO OUTLINES
+        borderRadius: BorderRadius.circular(20),
       ),
       child: Row(
         children: [
-          Icon(Icons.blur_on_rounded, size: 20, color: primaryColor),
-          const SizedBox(width: 12),
+          Icon(Icons.blur_on_rounded, size: 18, color: primaryColor),
+          const SizedBox(width: 10),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -446,7 +441,7 @@ class SettingsScreen extends StatelessWidget {
                 Text(
                   'Socialite',
                   style: theme.textTheme.titleLarge?.copyWith(
-                    fontSize: 14,
+                    fontSize: 13,
                     fontWeight: FontWeight.w800,
                   ),
                 ),

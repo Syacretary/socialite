@@ -13,7 +13,7 @@ class CustomHeader extends StatelessWidget {
     final theme = Theme.of(context);
 
     return Padding(
-      padding: const EdgeInsets.fromLTRB(20, 20, 20, 14),
+      padding: const EdgeInsets.fromLTRB(20, 16, 20, 10),
       child: Align(
         alignment: Alignment.centerLeft,
         child: Text(
@@ -35,21 +35,37 @@ class FeatherScrollWrapper extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return ShaderMask(
-      shaderCallback: (Rect rect) {
-        return const LinearGradient(
-          begin: Alignment.topCenter,
-          end: Alignment.bottomCenter,
-          colors: [
-            Colors.transparent,
-            Colors.black,
-            Colors.black,
-          ],
-          stops: [0.0, 0.045, 1.0],
-        ).createShader(rect);
-      },
-      blendMode: BlendMode.dstIn,
-      child: child,
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+    final bgColor = isDark ? const Color(0xFF000000) : const Color(0xFFF8F9FA);
+
+    return Stack(
+      children: [
+        // Native rock-solid scrollable child without shader repaint overhead
+        Positioned.fill(child: child),
+
+        // Feather gradient overlay at the top: content gracefully fades underneath
+        Positioned(
+          top: 0,
+          left: 0,
+          right: 0,
+          height: 22,
+          child: IgnorePointer(
+            child: Container(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                  colors: [
+                    bgColor,
+                    bgColor.withOpacity(0.0),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ),
+      ],
     );
   }
 }
