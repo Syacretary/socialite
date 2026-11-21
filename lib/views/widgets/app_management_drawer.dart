@@ -352,7 +352,7 @@ class _AppManagementDrawerState extends State<AppManagementDrawer> {
                       ),
                       const SizedBox(height: 2),
                       Text(
-                        'Aktifkan layanan Socialite untuk deteksi & blokir fitur ${app.name} secara langsung.',
+                        'Aktifkan layanan Lifelit untuk deteksi & blokir fitur ${app.name} secara langsung.',
                         style: TextStyle(
                           fontSize: 9,
                           color: isDark ? const Color(0xFFAAAAAA) : const Color(0xFF555555),

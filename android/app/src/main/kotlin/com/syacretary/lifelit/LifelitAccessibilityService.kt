@@ -1,4 +1,4 @@
-package com.example.socialite
+package com.syacretary.lifelit
 
 import android.accessibilityservice.AccessibilityService
 import android.accessibilityservice.GestureDescription
@@ -11,17 +11,17 @@ import android.os.Looper
 import android.view.accessibility.AccessibilityEvent
 import android.view.accessibility.AccessibilityNodeInfo
 
-class SocialiteAccessibilityService : AccessibilityService() {
+class LifelitAccessibilityService : AccessibilityService() {
 
-    private var overlayManager: SocialiteOverlayManager? = null
+    private var overlayManager: LifelitOverlayManager? = null
     private val handler = Handler(Looper.getMainLooper())
     private var lastActionTimestamp = 0L
 
     companion object {
-        var instance: SocialiteAccessibilityService? = null
+        var instance: LifelitAccessibilityService? = null
             private set
 
-        private const val PREFS_NAME = "socialite_rules"
+        private const val PREFS_NAME = "lifelit_rules"
         private const val KEY_RULES = "active_feature_rules"
 
         // Map: appId (e.g. "instagram") -> Set of blocked feature IDs (e.g. {"disable_reels", "disable_feeds"})
@@ -61,7 +61,7 @@ class SocialiteAccessibilityService : AccessibilityService() {
     override fun onServiceConnected() {
         super.onServiceConnected()
         instance = this
-        overlayManager = SocialiteOverlayManager(this)
+        overlayManager = LifelitOverlayManager(this)
         loadRulesFromPrefs(this)
     }
 

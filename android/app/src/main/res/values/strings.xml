@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="app_name">Socialite</string>
-    <string name="accessibility_service_label">Socialite - Pemblokir Fitur Distraksi</string>
-    <string name="accessibility_service_description">Mengizinkan Socialite memblokir fitur adiktif spesifik seperti YouTube Shorts, Instagram Reels &amp; Feeds, serta TikTok FYP sesuai setelan yang Anda atur.</string>
+    <string name="app_name">Lifelit - Stop Doom Scrolling</string>
+    <string name="accessibility_service_label">Lifelit - Stop Doom Scrolling</string>
+    <string name="accessibility_service_description">Mengizinkan Lifelit memblokir fitur adiktif spesifik seperti YouTube Shorts, Instagram Reels &amp; Feeds, serta TikTok FYP sesuai setelan yang Anda atur.</string>
 </resources>

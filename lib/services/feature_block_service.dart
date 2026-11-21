@@ -4,7 +4,7 @@ import '../providers/app_management_provider.dart';
 /// Bridge between Flutter UI and Android Native Accessibility Service
 /// for real-time feature block detection and execution.
 class FeatureBlockService {
-  static const MethodChannel _channel = MethodChannel('com.socialite.app/features');
+  static const MethodChannel _channel = MethodChannel('com.syacretary.lifelit/features');
 
   static Future<bool> isAccessibilityGranted() async {
     try {

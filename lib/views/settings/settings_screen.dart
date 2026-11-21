@@ -453,7 +453,7 @@ class SettingsScreen extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  'Socialite',
+                  'Lifelit',
                   style: theme.textTheme.titleLarge?.copyWith(
                     fontSize: 13,
                     fontWeight: FontWeight.w800,

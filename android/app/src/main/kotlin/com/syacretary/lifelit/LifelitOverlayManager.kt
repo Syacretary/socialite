@@ -1,4 +1,4 @@
-package com.example.socialite
+package com.syacretary.lifelit
 
 import android.content.Context
 import android.graphics.Color
@@ -17,7 +17,7 @@ import android.widget.TextView
  * Covers the addictive content feed area while leaving the top search bar
  * and bottom navigation bar uncovered and fully interactive.
  */
-class SocialiteOverlayManager(private val context: Context) {
+class LifelitOverlayManager(private val context: Context) {
     private val windowManager = context.getSystemService(Context.WINDOW_SERVICE) as WindowManager
     private var overlayView: View? = null
     private var isOverlayShowing = false
@@ -87,7 +87,7 @@ class SocialiteOverlayManager(private val context: Context) {
 
             // Badge note
             addView(TextView(context).apply {
-                text = "Socialite • Search & Navbar Aktif"
+                text = "Lifelit • Search & Navbar Aktif"
                 setTextColor(if (isDark) Color.parseColor("#555555") else Color.parseColor("#999999"))
                 textSize = 10f
                 gravity = Gravity.CENTER

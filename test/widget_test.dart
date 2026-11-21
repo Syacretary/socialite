@@ -15,7 +15,7 @@ void main() {
           ChangeNotifierProvider(create: (_) => AppManagementProvider()),
           ChangeNotifierProvider(create: (_) => ScreentimeProvider()),
         ],
-        child: const SocialiteApp(),
+        child: const LifelitApp(),
       ),
     );
     expect(find.byType(MaterialApp), findsOneWidget);

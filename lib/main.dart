@@ -21,20 +21,20 @@ void main() {
         ChangeNotifierProvider(create: (_) => AppManagementProvider()),
         ChangeNotifierProvider(create: (_) => ScreentimeProvider()),
       ],
-      child: const SocialiteApp(),
+      child: const LifelitApp(),
     ),
   );
 }
 
-class SocialiteApp extends StatelessWidget {
-  const SocialiteApp({super.key});
+class LifelitApp extends StatelessWidget {
+  const LifelitApp({super.key});
 
   @override
   Widget build(BuildContext context) {
     final settings = Provider.of<SettingsProvider>(context);
 
     return MaterialApp(
-      title: 'Socialite',
+      title: 'Lifelit - Stop Doom Scrolling',
       debugShowCheckedModeBanner: false,
       theme: AppTheme.lightTheme,
       darkTheme: AppTheme.darkTheme,

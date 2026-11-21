@@ -12,8 +12,8 @@ class AppLocalizations {
   static const Map<String, Map<String, String>> _localizedValues = {
     'id': {
       // General
-      'appName': 'Socialite',
-      'tagline': 'Batas Sehat Digital',
+      'appName': 'Lifelit',
+      'tagline': 'Stop Doom Scrolling',
 
       // Navigation
       'navManage': 'Atur App',
@@ -70,7 +70,7 @@ class AppLocalizations {
       'permissionAccessibility': 'Layanan Aksesibilitas (Blokir Fitur)',
       'permissionAccessibilityDesc': 'Wajib aktif untuk blokir Shorts, Reels, FYP & Feeds',
       'accessibilityBannerTitle': 'Layanan Aksesibilitas Belum Aktif',
-      'accessibilityBannerDesc': 'Socialite memerlukan izin Aksesibilitas agar dapat mendeteksi & memblokir Shorts, Reels, atau FYP.',
+      'accessibilityBannerDesc': 'Lifelit memerlukan izin Aksesibilitas agar dapat mendeteksi & memblokir Shorts, Reels, atau FYP.',
       'enableNow': 'Aktifkan Izin',
       'statusActive': 'Aktif',
       'statusInactive': 'Nonaktif',
@@ -80,8 +80,8 @@ class AppLocalizations {
     },
     'en': {
       // General
-      'appName': 'Socialite',
-      'tagline': 'Digital Wellness Minimalist',
+      'appName': 'Lifelit',
+      'tagline': 'Stop Doom Scrolling',
 
       // Navigation
       'navManage': 'Manage',
@@ -138,7 +138,7 @@ class AppLocalizations {
       'permissionAccessibility': 'Accessibility Service (Feature Blocker)',
       'permissionAccessibilityDesc': 'Required to block Shorts, Reels, FYP & Feeds',
       'accessibilityBannerTitle': 'Accessibility Service Disabled',
-      'accessibilityBannerDesc': 'Socialite needs Accessibility permission to detect and intercept Shorts, Reels, or FYP.',
+      'accessibilityBannerDesc': 'Lifelit needs Accessibility permission to detect and intercept Shorts, Reels, or FYP.',
       'enableNow': 'Enable Service',
       'statusActive': 'Active',
       'statusInactive': 'Disabled',

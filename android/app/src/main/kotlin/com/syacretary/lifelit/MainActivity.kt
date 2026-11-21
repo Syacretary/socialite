@@ -1,4 +1,4 @@
-package com.example.socialite
+package com.syacretary.lifelit
 
 import android.app.AppOpsManager
 import android.content.Context
@@ -13,7 +13,7 @@ import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodChannel
 
 class MainActivity : FlutterActivity() {
-    private val CHANNEL = "com.socialite.app/features"
+    private val CHANNEL = "com.syacretary.lifelit/features"
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
@@ -77,7 +77,7 @@ class MainActivity : FlutterActivity() {
                     try {
                         @Suppress("UNCHECKED_CAST")
                         val rules = call.arguments as? Map<String, List<String>> ?: emptyMap()
-                        SocialiteAccessibilityService.syncRules(this, rules)
+                        LifelitAccessibilityService.syncRules(this, rules)
                         result.success(true)
                     } catch (e: Exception) {
                         result.error("ERROR", e.message, null)
@@ -91,9 +91,9 @@ class MainActivity : FlutterActivity() {
     }
 
     private fun isAccessibilityServiceEnabled(): Boolean {
-        if (SocialiteAccessibilityService.isServiceRunning()) return true
+        if (LifelitAccessibilityService.isServiceRunning()) return true
 
-        val expectedComponentName = "$packageName/${SocialiteAccessibilityService::class.java.canonicalName}"
+        val expectedComponentName = "$packageName/${LifelitAccessibilityService::class.java.canonicalName}"
         val enabledServicesSetting = Settings.Secure.getString(
             contentResolver,
             Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES
@@ -105,7 +105,7 @@ class MainActivity : FlutterActivity() {
         while (colonSplitter.hasNext()) {
             val componentName = colonSplitter.next()
             if (componentName.equals(expectedComponentName, ignoreCase = true) ||
-                componentName.contains("SocialiteAccessibilityService", ignoreCase = true)) {
+                componentName.contains("LifelitAccessibilityService", ignoreCase = true)) {
                 return true
             }
         }

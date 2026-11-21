@@ -270,7 +270,7 @@ class LimitEnforcementService {
                     ),
                     child: Center(
                       child: Text(
-                        'Kembali ke Socialite',
+                        'Kembali ke Lifelit',
                         style: TextStyle(
                           fontSize: 13,
                           fontWeight: FontWeight.w700,

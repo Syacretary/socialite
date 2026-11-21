@@ -1,6 +1,6 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools"
-    package="com.example.socialite">
+    package="com.syacretary.lifelit">
 
     <!-- Permissions for Screen Time and Feature Restriction -->
     <uses-permission
@@ -13,7 +13,7 @@
         tools:ignore="ProtectedPermissions" />
 
     <application
-        android:label="Socialite"
+        android:label="Lifelit"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher">
 
@@ -37,7 +37,7 @@
 
         <!-- Accessibility Service for Smart Feature Blocking (Shorts, Reels, FYP, Feeds) -->
         <service
-            android:name=".SocialiteAccessibilityService"
+            android:name=".LifelitAccessibilityService"
             android:label="@string/accessibility_service_label"
             android:permission="android.permission.BIND_ACCESSIBILITY_SERVICE"
             android:exported="true">
