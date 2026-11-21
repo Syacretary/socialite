@@ -13,6 +13,8 @@ class AppManagementProvider extends ChangeNotifier {
       category: 'Social Media',
       usageMinutesToday: 98,
       isRestricted: true,
+      dailyLimitMinutes: 30,
+      actionOnLimit: LimitAction.blockAndClose,
     ),
     AppItem(
       id: 'tiktok',
@@ -24,6 +26,8 @@ class AppManagementProvider extends ChangeNotifier {
       category: 'Video Feed',
       usageMinutesToday: 124,
       isRestricted: true,
+      dailyLimitMinutes: 15,
+      actionOnLimit: LimitAction.blockAndClose,
     ),
     AppItem(
       id: 'youtube',
@@ -35,6 +39,8 @@ class AppManagementProvider extends ChangeNotifier {
       category: 'Entertainment',
       usageMinutesToday: 72,
       isRestricted: false,
+      dailyLimitMinutes: 60,
+      actionOnLimit: LimitAction.popupReminder,
     ),
     AppItem(
       id: 'x_twitter',
@@ -48,6 +54,8 @@ class AppManagementProvider extends ChangeNotifier {
       category: 'Microblog',
       usageMinutesToday: 45,
       isRestricted: false,
+      dailyLimitMinutes: 30,
+      actionOnLimit: LimitAction.notifyOnly,
     ),
     AppItem(
       id: 'reddit',
@@ -59,6 +67,8 @@ class AppManagementProvider extends ChangeNotifier {
       category: 'Community',
       usageMinutesToday: 32,
       isRestricted: false,
+      dailyLimitMinutes: 45,
+      actionOnLimit: LimitAction.popupReminder,
     ),
     AppItem(
       id: 'facebook',
@@ -70,6 +80,8 @@ class AppManagementProvider extends ChangeNotifier {
       category: 'Social Network',
       usageMinutesToday: 20,
       isRestricted: false,
+      dailyLimitMinutes: 30,
+      actionOnLimit: LimitAction.blockAndClose,
     ),
     AppItem(
       id: 'threads',
@@ -83,6 +95,8 @@ class AppManagementProvider extends ChangeNotifier {
       category: 'Text Feed',
       usageMinutesToday: 18,
       isRestricted: false,
+      dailyLimitMinutes: 20,
+      actionOnLimit: LimitAction.notifyOnly,
     ),
     AppItem(
       id: 'snapchat',
@@ -94,6 +108,8 @@ class AppManagementProvider extends ChangeNotifier {
       category: 'Messaging',
       usageMinutesToday: 15,
       isRestricted: false,
+      dailyLimitMinutes: 15,
+      actionOnLimit: LimitAction.blockAndClose,
     ),
   ];
 
@@ -106,6 +122,14 @@ class AppManagementProvider extends ChangeNotifier {
   List<AppItem> get allApps => List.unmodifiable(_apps);
   List<AppItem> get restrictedApps => _apps.where((app) => app.isRestricted).toList();
   List<AppItem> get availableApps => _apps.where((app) => !app.isRestricted).toList();
+
+  AppItem? getAppById(String id) {
+    try {
+      return _apps.firstWhere((app) => app.id == id);
+    } catch (_) {
+      return null;
+    }
+  }
 
   void setDraggingOverRestricted(bool isOver) {
     if (_isDraggingOverRestrictedZone != isOver) {
@@ -142,6 +166,44 @@ class AppManagementProvider extends ChangeNotifier {
     if (index != -1) {
       _apps[index].isRestricted = !_apps[index].isRestricted;
       notifyListeners();
+    }
+  }
+
+  // --- Real-time Auto-save Management Methods ---
+
+  void updateDailyLimit(String appId, int minutes) {
+    final index = _apps.indexWhere((app) => app.id == appId);
+    if (index != -1) {
+      final clamped = minutes.clamp(1, 150); // 1 min to 2.5 hours
+      if (_apps[index].dailyLimitMinutes != clamped) {
+        _apps[index].dailyLimitMinutes = clamped;
+        notifyListeners();
+      }
+    }
+  }
+
+  void updateLimitAction(String appId, LimitAction action) {
+    final index = _apps.indexWhere((app) => app.id == appId);
+    if (index != -1) {
+      if (_apps[index].actionOnLimit != action) {
+        _apps[index].actionOnLimit = action;
+        notifyListeners();
+      }
+    }
+  }
+
+  void toggleFeatureBlock(String appId, String featureId) {
+    final appIndex = _apps.indexWhere((app) => app.id == appId);
+    if (appIndex != -1) {
+      final features = List<AppFeatureBlock>.from(_apps[appIndex].featureBlocks);
+      final featIndex = features.indexWhere((f) => f.id == featureId);
+      if (featIndex != -1) {
+        features[featIndex] = features[featIndex].copyWith(
+          isBlocked: !features[featIndex].isBlocked,
+        );
+        _apps[appIndex].featureBlocks = features;
+        notifyListeners();
+      }
     }
   }
 }

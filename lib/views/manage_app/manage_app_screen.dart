@@ -5,8 +5,8 @@ import '../../core/localization/app_localizations.dart';
 import '../../models/app_item.dart';
 import '../../providers/app_management_provider.dart';
 import '../../providers/settings_provider.dart';
+import '../widgets/app_management_drawer.dart';
 import '../widgets/custom_app_bar.dart';
-import '../widgets/smooth_sheet.dart';
 
 class ManageAppScreen extends StatelessWidget {
   const ManageAppScreen({super.key});
@@ -178,12 +178,8 @@ class ManageAppScreen extends StatelessWidget {
                       isDark: isDark,
                       primaryColor: primaryColor,
                       onTap: () {
-                        SmoothAppSheet.show(
-                          context: context,
-                          app: app,
-                          isDark: isDark,
-                          onToggleRestriction: () => provider.toggleRestriction(app.id),
-                        );
+                        // Open new App Management Drawer
+                        AppManagementDrawer.show(context, app.id);
                       },
                       onTapEject: () {
                         HapticFeedback.lightImpact();
@@ -284,12 +280,8 @@ class ManageAppScreen extends StatelessWidget {
                       isDark: isDark,
                       primaryColor: primaryColor,
                       onTap: () {
-                        SmoothAppSheet.show(
-                          context: context,
-                          app: app,
-                          isDark: isDark,
-                          onToggleRestriction: () => provider.toggleRestriction(app.id),
-                        );
+                        // Open new App Management Drawer
+                        AppManagementDrawer.show(context, app.id);
                       },
                       onTapEject: () {},
                     );
@@ -329,7 +321,7 @@ class ManageAppScreen extends StatelessWidget {
             Stack(
               clipBehavior: Clip.none,
               children: [
-                // Prominent unboxed authentic app icon (ENLARGED to 38px, NO CIRCLE BORDER)
+                // Prominent unboxed authentic app icon
                 SizedBox(
                   width: 40,
                   height: 40,

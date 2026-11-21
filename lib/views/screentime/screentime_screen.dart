@@ -6,7 +6,7 @@ import '../../providers/app_management_provider.dart';
 import '../../providers/screentime_provider.dart';
 import '../../providers/settings_provider.dart';
 import '../widgets/custom_app_bar.dart';
-import '../widgets/smooth_sheet.dart';
+import '../widgets/app_management_drawer.dart';
 
 class ScreentimeScreen extends StatelessWidget {
   const ScreentimeScreen({super.key});
@@ -415,12 +415,7 @@ class ScreentimeScreen extends StatelessWidget {
 
               return InkWell(
                 onTap: () {
-                  SmoothAppSheet.show(
-                    context: context,
-                    app: app,
-                    isDark: isDark,
-                    onToggleRestriction: () => provider.toggleRestriction(app.id),
-                  );
+                  AppManagementDrawer.show(context, app.id);
                 },
                 borderRadius: BorderRadius.circular(12),
                 child: Padding(
