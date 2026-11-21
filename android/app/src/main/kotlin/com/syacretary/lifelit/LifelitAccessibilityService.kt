@@ -365,11 +365,18 @@ class LifelitAccessibilityService : AccessibilityService() {
         }
 
         if (rules.contains("disable_home")) {
+            // Check if user is in search mode (typing a query, viewing suggestions, or viewing search results)
+            val isSearchMode = isYouTubeInSearchMode(root)
+            if (isSearchMode) {
+                // User is actively searching or viewing search results -> NEVER block search results!
+                scheduleHideOverlay(150L)
+                return
+            }
+
             val isHome = isYouTubeHomeTab(root)
-            val isSearching = isSearchActive(root, listOf("search_edit_text", "search_bar", "query"))
 
             // If user is on Home tab and not searching, show overlay
-            if (isHome && !isSearching) {
+            if (isHome) {
                 cancelPendingHide()
 
                 // Calculate exact pixel bounds from on-screen node hierarchy
@@ -389,6 +396,58 @@ class LifelitAccessibilityService : AccessibilityService() {
         } else {
             hideOverlayImmediate()
         }
+    }
+
+    /**
+     * Determines whether YouTube is in Search Mode (typing a query,
+     * viewing search suggestions, or viewing search results).
+     *
+     * Key indicators of Search Mode:
+     * 1. search_edit_text is present (contains the query on the search results page).
+     * 2. search_clear_button or filter_button is present.
+     * 3. Back / Up button is present in the toolbar (Home feed NEVER has a back button).
+     * 4. youtube_logo is absent (Search results replaces the logo with the search bar).
+     */
+    private fun isYouTubeInSearchMode(root: AccessibilityNodeInfo): Boolean {
+        // 1. Check if search input field is in the view tree
+        val searchEditNodes = root.findAccessibilityNodeInfosByViewId("com.google.android.youtube:id/search_edit_text")
+        if (!searchEditNodes.isNullOrEmpty()) return true
+
+        val searchClearNodes = root.findAccessibilityNodeInfosByViewId("com.google.android.youtube:id/search_clear_button")
+        if (!searchClearNodes.isNullOrEmpty()) return true
+
+        // 2. Check for search filter button or search results container
+        val filterNodes = root.findAccessibilityNodeInfosByViewId("com.google.android.youtube:id/filter_button")
+        if (!filterNodes.isNullOrEmpty()) return true
+
+        // 3. Check for Back navigation button in top bar while YouTube logo is absent
+        val toolbarNodes = root.findAccessibilityNodeInfosByViewId("com.google.android.youtube:id/toolbar")
+        if (!toolbarNodes.isNullOrEmpty()) {
+            val toolbar = toolbarNodes[0]
+            var hasBackButton = false
+            for (i in 0 until toolbar.childCount) {
+                val child = toolbar.getChild(i) ?: continue
+                val desc = child.contentDescription?.toString() ?: ""
+                if (desc.contains("Navigate up", ignoreCase = true) ||
+                    desc.contains("Kembali", ignoreCase = true) ||
+                    desc.contains("Back", ignoreCase = true)) {
+                    hasBackButton = true
+                    break
+                }
+            }
+            if (hasBackButton) {
+                val logoNodes = root.findAccessibilityNodeInfosByViewId("com.google.android.youtube:id/youtube_logo")
+                if (logoNodes.isNullOrEmpty()) {
+                    return true
+                }
+            }
+        }
+
+        // 4. Check for query view
+        val queryNodes = root.findAccessibilityNodeInfosByViewId("com.google.android.youtube:id/query")
+        if (!queryNodes.isNullOrEmpty()) return true
+
+        return false
     }
 
     /**
@@ -454,6 +513,9 @@ class LifelitAccessibilityService : AccessibilityService() {
     }
 
     private fun isYouTubeHomeTab(root: AccessibilityNodeInfo): Boolean {
+        // If in search mode (typing or viewing search results), definitely not Home feed
+        if (isYouTubeInSearchMode(root)) return false
+
         // If Shorts full-screen player is active, definitely not Home
         val reelWatchNodes = root.findAccessibilityNodeInfosByViewId("com.google.android.youtube:id/reel_watch_fragment_root")
         if (!reelWatchNodes.isNullOrEmpty()) return false
