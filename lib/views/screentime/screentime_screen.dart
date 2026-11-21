@@ -427,11 +427,16 @@ class ScreentimeScreen extends StatelessWidget {
                   padding: const EdgeInsets.symmetric(vertical: 2),
                   child: Row(
                     children: [
-                      SizedBox(
-                        width: 28,
-                        height: 28,
+                      // Contrast circular badge prevents dark icon blending
+                      Container(
+                        width: 32,
+                        height: 32,
+                        decoration: BoxDecoration(
+                          color: isDark ? const Color(0xFF161616) : const Color(0xFFEBECEF),
+                          shape: BoxShape.circle,
+                        ),
                         child: Center(
-                          child: app.buildLogo(size: 24),
+                          child: app.buildLogo(size: 20, isDark: isDark),
                         ),
                       ),
                       const SizedBox(width: 10),

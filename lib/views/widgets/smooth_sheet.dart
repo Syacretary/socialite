@@ -110,7 +110,6 @@ class _AppSheetContentState extends State<_AppSheetContent> with SingleTickerPro
                   decoration: BoxDecoration(
                     color: surfaceColor.withOpacity(0.96),
                     borderRadius: BorderRadius.circular(32),
-                    // NO OUTLINES
                   ),
                   child: ScaleTransition(
                     scale: _scaleAnimation,
@@ -126,14 +125,18 @@ class _AppSheetContentState extends State<_AppSheetContent> with SingleTickerPro
                             borderRadius: BorderRadius.circular(4),
                           ),
                         ),
-                        const SizedBox(height: 20),
+                        const SizedBox(height: 18),
 
-                        // Authentic App Logo
-                        SizedBox(
-                          width: 48,
-                          height: 48,
+                        // Authentic App Logo with elevated contrast badge
+                        Container(
+                          width: 52,
+                          height: 52,
+                          decoration: BoxDecoration(
+                            color: isDark ? const Color(0xFF1E1E1E) : const Color(0xFFEBECEF),
+                            shape: BoxShape.circle,
+                          ),
                           child: Center(
-                            child: app.buildLogo(size: 40),
+                            child: app.buildLogo(size: 32, isDark: isDark),
                           ),
                         ),
                         const SizedBox(height: 12),
@@ -156,7 +159,7 @@ class _AppSheetContentState extends State<_AppSheetContent> with SingleTickerPro
                           ),
                         ),
 
-                        const SizedBox(height: 20),
+                        const SizedBox(height: 18),
 
                         // Quick Usage & Restriction Status Bar (No Outlines)
                         Container(
@@ -164,7 +167,6 @@ class _AppSheetContentState extends State<_AppSheetContent> with SingleTickerPro
                           decoration: BoxDecoration(
                             color: isDark ? const Color(0xFF1A1A1A) : const Color(0xFFF3F4F6),
                             borderRadius: BorderRadius.circular(20),
-                            // NO OUTLINES
                           ),
                           child: Row(
                             mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -212,7 +214,7 @@ class _AppSheetContentState extends State<_AppSheetContent> with SingleTickerPro
                           ),
                         ),
 
-                        const SizedBox(height: 20),
+                        const SizedBox(height: 18),
 
                         // Action Button (No Outlines)
                         SizedBox(

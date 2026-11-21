@@ -329,18 +329,22 @@ class ManageAppScreen extends StatelessWidget {
             Stack(
               clipBehavior: Clip.none,
               children: [
-                // Authentic Logo
-                SizedBox(
-                  width: 28,
-                  height: 28,
+                // Contrast circular badge prevents blending with background
+                Container(
+                  width: 32,
+                  height: 32,
+                  decoration: BoxDecoration(
+                    color: isDark ? const Color(0xFF1C1C1E) : const Color(0xFFEBECEF),
+                    shape: BoxShape.circle,
+                  ),
                   child: Center(
-                    child: app.buildLogo(size: 24),
+                    child: app.buildLogo(size: 20, isDark: isDark),
                   ),
                 ),
                 if (isRestricted)
                   Positioned(
-                    top: -4,
-                    right: -6,
+                    top: -3,
+                    right: -4,
                     child: GestureDetector(
                       onTap: onTapEject,
                       child: Container(
@@ -408,7 +412,17 @@ class ManageAppScreen extends StatelessWidget {
               mainAxisSize: MainAxisSize.min,
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                app.buildLogo(size: 26),
+                Container(
+                  width: 32,
+                  height: 32,
+                  decoration: BoxDecoration(
+                    color: isDark ? const Color(0xFF1C1C1E) : const Color(0xFFEBECEF),
+                    shape: BoxShape.circle,
+                  ),
+                  child: Center(
+                    child: app.buildLogo(size: 20, isDark: isDark),
+                  ),
+                ),
                 const SizedBox(height: 4),
                 Text(
                   app.name,

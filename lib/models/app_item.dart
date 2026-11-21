@@ -6,6 +6,8 @@ class AppItem {
   final String packageName;
   final IconData icon;
   final String? iconAsset;
+  final String? darkIconAsset;
+  final bool isMonochrome;
   final Color brandColor;
   final String category;
   final int usageMinutesToday;
@@ -17,6 +19,8 @@ class AppItem {
     required this.packageName,
     required this.icon,
     this.iconAsset,
+    this.darkIconAsset,
+    this.isMonochrome = false,
     required this.brandColor,
     required this.category,
     required this.usageMinutesToday,
@@ -32,17 +36,31 @@ class AppItem {
     return '${mins}m';
   }
 
-  Widget buildLogo({double size = 26, Color? tintColor}) {
-    if (iconAsset != null && iconAsset!.isNotEmpty) {
+  Widget buildLogo({double size = 26, bool isDark = false, Color? tintColor}) {
+    final asset = (isDark && darkIconAsset != null) ? darkIconAsset! : iconAsset;
+
+    if (asset != null && asset.isNotEmpty) {
       return Image.asset(
-        iconAsset!,
+        asset,
         width: size,
         height: size,
         fit: BoxFit.contain,
-        errorBuilder: (_, __, ___) => Icon(icon, size: size, color: tintColor),
+        color: isMonochrome
+            ? (tintColor ?? (isDark ? Colors.white : Colors.black))
+            : null,
+        colorBlendMode: isMonochrome ? BlendMode.srcIn : null,
+        errorBuilder: (_, __, ___) => Icon(
+          icon,
+          size: size,
+          color: tintColor ?? (isDark ? Colors.white : Colors.black),
+        ),
       );
     }
-    return Icon(icon, size: size, color: tintColor);
+    return Icon(
+      icon,
+      size: size,
+      color: tintColor ?? (isDark ? Colors.white : Colors.black),
+    );
   }
 
   AppItem copyWith({
@@ -51,6 +69,8 @@ class AppItem {
     String? packageName,
     IconData? icon,
     String? iconAsset,
+    String? darkIconAsset,
+    bool? isMonochrome,
     Color? brandColor,
     String? category,
     int? usageMinutesToday,
@@ -62,6 +82,8 @@ class AppItem {
       packageName: packageName ?? this.packageName,
       icon: icon ?? this.icon,
       iconAsset: iconAsset ?? this.iconAsset,
+      darkIconAsset: darkIconAsset ?? this.darkIconAsset,
+      isMonochrome: isMonochrome ?? this.isMonochrome,
       brandColor: brandColor ?? this.brandColor,
       category: category ?? this.category,
       usageMinutesToday: usageMinutesToday ?? this.usageMinutesToday,
