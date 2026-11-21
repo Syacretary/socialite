@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../models/app_item.dart';
+import '../services/feature_block_service.dart';
 
 class AppManagementProvider extends ChangeNotifier {
   final List<AppItem> _apps = [
@@ -203,6 +204,7 @@ class AppManagementProvider extends ChangeNotifier {
         );
         _apps[appIndex].featureBlocks = features;
         notifyListeners();
+        FeatureBlockService.syncRules(this);
       }
     }
   }

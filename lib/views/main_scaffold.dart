@@ -5,6 +5,7 @@ import 'package:provider/provider.dart';
 import '../core/localization/app_localizations.dart';
 import '../providers/app_management_provider.dart';
 import '../providers/settings_provider.dart';
+import '../services/feature_block_service.dart';
 import '../services/limit_enforcement_service.dart';
 import 'manage_app/manage_app_screen.dart';
 import 'screentime/screentime_screen.dart';
@@ -33,7 +34,10 @@ class _MainScaffoldState extends State<MainScaffold> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
       final provider = Provider.of<AppManagementProvider>(context, listen: false);
+      final settings = Provider.of<SettingsProvider>(context, listen: false);
       LimitEnforcementService.instance.start(provider, context);
+      FeatureBlockService.syncRules(provider);
+      settings.refreshPermissions();
     });
   }
 

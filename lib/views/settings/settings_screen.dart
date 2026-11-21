@@ -296,7 +296,21 @@ class SettingsScreen extends StatelessWidget {
             primaryColor: primaryColor,
             onToggle: () {
               HapticFeedback.lightImpact();
-              settings.toggleOverlayPermission();
+              settings.requestOverlayPermission();
+            },
+          ),
+          const SizedBox(height: 8),
+
+          _buildPermissionTile(
+            context: context,
+            title: loc.get('permissionAccessibility'),
+            subtitle: loc.get('permissionAccessibilityDesc'),
+            isActive: settings.accessibilityPermissionGranted,
+            isDark: isDark,
+            primaryColor: primaryColor,
+            onToggle: () {
+              HapticFeedback.lightImpact();
+              settings.requestAccessibilityPermission();
             },
           ),
         ],

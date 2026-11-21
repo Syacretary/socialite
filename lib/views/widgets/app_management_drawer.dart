@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import '../../models/app_item.dart';
 import '../../providers/app_management_provider.dart';
+import '../../providers/settings_provider.dart';
 
 class AppManagementDrawer extends StatefulWidget {
   final String appId;
@@ -28,6 +29,16 @@ class AppManagementDrawer extends StatefulWidget {
 class _AppManagementDrawerState extends State<AppManagementDrawer> {
   // 0 = Time Limit, 1 = Features Limit
   int _activeTab = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        Provider.of<SettingsProvider>(context, listen: false).refreshPermissions();
+      }
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -310,10 +321,72 @@ class _AppManagementDrawerState extends State<AppManagementDrawer> {
     bool isDark, Color primaryColor, Color cardColor,
   ) {
     final theme = Theme.of(context);
+    final settings = Provider.of<SettingsProvider>(context);
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
+        if (!settings.accessibilityPermissionGranted) ...[
+          Container(
+            padding: const EdgeInsets.all(12),
+            margin: const EdgeInsets.only(bottom: 12),
+            decoration: BoxDecoration(
+              color: isDark ? const Color(0xFF191919) : const Color(0xFFE8E9EC),
+              borderRadius: BorderRadius.circular(16),
+            ),
+            child: Row(
+              children: [
+                Icon(Icons.accessibility_new_rounded, size: 20, color: primaryColor),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Izin Aksesibilitas Dibutuhkan',
+                        style: TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w800,
+                          color: primaryColor,
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        'Aktifkan layanan Socialite untuk deteksi & blokir fitur ${app.name} secara langsung.',
+                        style: TextStyle(
+                          fontSize: 9,
+                          color: isDark ? const Color(0xFFAAAAAA) : const Color(0xFF555555),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 8),
+                GestureDetector(
+                  onTap: () {
+                    HapticFeedback.mediumImpact();
+                    settings.requestAccessibilityPermission();
+                  },
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                    decoration: BoxDecoration(
+                      color: primaryColor,
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Text(
+                      'Aktifkan',
+                      style: TextStyle(
+                        fontSize: 10,
+                        fontWeight: FontWeight.w800,
+                        color: isDark ? const Color(0xFF000000) : const Color(0xFFFFFFFF),
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
         Container(
           padding: const EdgeInsets.all(14),
           decoration: BoxDecoration(color: cardColor, borderRadius: BorderRadius.circular(20)),
