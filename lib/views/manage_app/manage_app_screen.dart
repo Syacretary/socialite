@@ -46,7 +46,7 @@ class ManageAppScreen extends StatelessWidget {
 
                           const SizedBox(height: 8),
 
-                          // VISUAL DRAG CONNECTOR HINT (Compact single line)
+                          // VISUAL DRAG CONNECTOR HINT
                           Center(
                             child: Padding(
                               padding: const EdgeInsets.symmetric(vertical: 2),
@@ -152,7 +152,7 @@ class ManageAppScreen extends StatelessWidget {
               ),
               const SizedBox(height: 10),
 
-              // Content of restricted zone (Compact, zero dead space)
+              // Content of restricted zone
               if (provider.restrictedApps.isEmpty)
                 Padding(
                   padding: const EdgeInsets.symmetric(vertical: 8),
@@ -316,7 +316,7 @@ class ManageAppScreen extends StatelessWidget {
     final cardContent = GestureDetector(
       onTap: onTap,
       child: Container(
-        width: 76, // Compact width that hugs tightly
+        width: 82, // Roomy compact width for enlarged icon
         padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 4),
         decoration: BoxDecoration(
           color: isDark ? const Color(0xFF121212) : const Color(0xFFFFFFFF),
@@ -329,26 +329,22 @@ class ManageAppScreen extends StatelessWidget {
             Stack(
               clipBehavior: Clip.none,
               children: [
-                // Contrast circular badge prevents blending with background
-                Container(
-                  width: 32,
-                  height: 32,
-                  decoration: BoxDecoration(
-                    color: isDark ? const Color(0xFF1C1C1E) : const Color(0xFFEBECEF),
-                    shape: BoxShape.circle,
-                  ),
+                // Prominent unboxed authentic app icon (ENLARGED to 38px, NO CIRCLE BORDER)
+                SizedBox(
+                  width: 40,
+                  height: 40,
                   child: Center(
-                    child: app.buildLogo(size: 20, isDark: isDark),
+                    child: app.buildLogo(size: 38, isDark: isDark),
                   ),
                 ),
                 if (isRestricted)
                   Positioned(
                     top: -3,
-                    right: -4,
+                    right: -5,
                     child: GestureDetector(
                       onTap: onTapEject,
                       child: Container(
-                        padding: const EdgeInsets.all(2),
+                        padding: const EdgeInsets.all(2.5),
                         decoration: BoxDecoration(
                           color: primaryColor,
                           shape: BoxShape.circle,
@@ -387,7 +383,7 @@ class ManageAppScreen extends StatelessWidget {
       ),
     );
 
-    // Draggable wrapper with mouse & touch responsiveness
+    // Draggable wrapper with enlarged feedback logo
     return Draggable<String>(
       data: app.id,
       feedback: Material(
@@ -395,7 +391,7 @@ class ManageAppScreen extends StatelessWidget {
         child: Transform.scale(
           scale: 1.08,
           child: Container(
-            width: 76,
+            width: 82,
             padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 4),
             decoration: BoxDecoration(
               color: isDark ? const Color(0xFF1F1F1F) : const Color(0xFFFFFFFF),
@@ -412,17 +408,7 @@ class ManageAppScreen extends StatelessWidget {
               mainAxisSize: MainAxisSize.min,
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                Container(
-                  width: 32,
-                  height: 32,
-                  decoration: BoxDecoration(
-                    color: isDark ? const Color(0xFF1C1C1E) : const Color(0xFFEBECEF),
-                    shape: BoxShape.circle,
-                  ),
-                  child: Center(
-                    child: app.buildLogo(size: 20, isDark: isDark),
-                  ),
-                ),
+                app.buildLogo(size: 40, isDark: isDark),
                 const SizedBox(height: 4),
                 Text(
                   app.name,

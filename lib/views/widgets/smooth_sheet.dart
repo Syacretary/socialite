@@ -127,16 +127,12 @@ class _AppSheetContentState extends State<_AppSheetContent> with SingleTickerPro
                         ),
                         const SizedBox(height: 18),
 
-                        // Authentic App Logo with elevated contrast badge
-                        Container(
-                          width: 52,
-                          height: 52,
-                          decoration: BoxDecoration(
-                            color: isDark ? const Color(0xFF1E1E1E) : const Color(0xFFEBECEF),
-                            shape: BoxShape.circle,
-                          ),
+                        // Prominent authentic app icon (NO CIRCLE BORDER, ENLARGED to 54px)
+                        SizedBox(
+                          width: 58,
+                          height: 58,
                           child: Center(
-                            child: app.buildLogo(size: 32, isDark: isDark),
+                            child: app.buildLogo(size: 54, isDark: isDark),
                           ),
                         ),
                         const SizedBox(height: 12),
@@ -161,7 +157,7 @@ class _AppSheetContentState extends State<_AppSheetContent> with SingleTickerPro
 
                         const SizedBox(height: 18),
 
-                        // Quick Usage & Restriction Status Bar (No Outlines)
+                        // Quick Usage & Restriction Status Bar
                         Container(
                           padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
                           decoration: BoxDecoration(
@@ -216,7 +212,7 @@ class _AppSheetContentState extends State<_AppSheetContent> with SingleTickerPro
 
                         const SizedBox(height: 18),
 
-                        // Action Button (No Outlines)
+                        // Action Button
                         SizedBox(
                           width: double.infinity,
                           child: TextButton(

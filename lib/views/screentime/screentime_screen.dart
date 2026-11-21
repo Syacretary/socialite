@@ -65,7 +65,7 @@ class ScreentimeScreen extends StatelessWidget {
 
                           const SizedBox(height: 10),
 
-                          // BREAKDOWN APPS LIST
+                          // BREAKDOWN APPS LIST (Enlarged Unboxed Authentic Logos)
                           _buildAppBreakdownList(context, loc, isDark, appsProvider, totalMinutes, primaryColor),
                         ],
                       ),
@@ -326,7 +326,7 @@ class ScreentimeScreen extends StatelessWidget {
           ),
           const SizedBox(height: 10),
           SizedBox(
-            height: 65, // Compact vertical size
+            height: 65,
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceEvenly,
               crossAxisAlignment: CrossAxisAlignment.end,
@@ -408,7 +408,7 @@ class ScreentimeScreen extends StatelessWidget {
             shrinkWrap: true,
             physics: const NeverScrollableScrollPhysics(),
             itemCount: sortedApps.length,
-            separatorBuilder: (_, __) => const SizedBox(height: 8),
+            separatorBuilder: (_, __) => const SizedBox(height: 10),
             itemBuilder: (context, index) {
               final app = sortedApps[index];
               final ratio = maxAppMinutes > 0 ? (app.usageMinutesToday / maxAppMinutes) : 0.0;
@@ -427,19 +427,15 @@ class ScreentimeScreen extends StatelessWidget {
                   padding: const EdgeInsets.symmetric(vertical: 2),
                   child: Row(
                     children: [
-                      // Contrast circular badge prevents dark icon blending
-                      Container(
-                        width: 32,
-                        height: 32,
-                        decoration: BoxDecoration(
-                          color: isDark ? const Color(0xFF161616) : const Color(0xFFEBECEF),
-                          shape: BoxShape.circle,
-                        ),
+                      // Prominent authentic app icon (NO CIRCLE BORDER, ENLARGED to 34px)
+                      SizedBox(
+                        width: 36,
+                        height: 36,
                         child: Center(
-                          child: app.buildLogo(size: 20, isDark: isDark),
+                          child: app.buildLogo(size: 34, isDark: isDark),
                         ),
                       ),
-                      const SizedBox(width: 10),
+                      const SizedBox(width: 12),
                       Expanded(
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
