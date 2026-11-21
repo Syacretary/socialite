@@ -206,4 +206,17 @@ class AppManagementProvider extends ChangeNotifier {
       }
     }
   }
+
+  /// Simulate one minute of usage for a restricted app (called by LimitEnforcementService).
+  void incrementUsage(String appId) {
+    final index = _apps.indexWhere((app) => app.id == appId);
+    if (index != -1) {
+      // usageMinutesToday is final on the model; we replace the item
+      final old = _apps[index];
+      _apps[index] = old.copyWith(
+        usageMinutesToday: old.usageMinutesToday + 1,
+      );
+      notifyListeners();
+    }
+  }
 }

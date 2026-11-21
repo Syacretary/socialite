@@ -80,53 +80,79 @@ class AppManagementDrawer extends StatelessWidget {
                       ),
                     ),
 
-                    // Scrollable configuration content
+                    // Scrollable configuration content with bottom feather overlay
                     Expanded(
-                      child: SingleChildScrollView(
-                        physics: const BouncingScrollPhysics(),
-                        padding: const EdgeInsets.fromLTRB(16, 2, 16, 20),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.stretch,
-                          children: [
-                            // SECTION 1: BATAS DURASI HARIAN (Recommended & Custom)
-                            _buildDurationSection(context, app, provider, isDark, primaryColor, cardColor),
+                      child: Stack(
+                        children: [
+                          SingleChildScrollView(
+                            physics: const BouncingScrollPhysics(),
+                            padding: const EdgeInsets.fromLTRB(16, 2, 16, 48),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.stretch,
+                              children: [
+                                // SECTION 1: BATAS DURASI HARIAN (Recommended & Custom)
+                                _buildDurationSection(context, app, provider, isDark, primaryColor, cardColor),
 
-                            const SizedBox(height: 12),
+                                const SizedBox(height: 12),
 
-                            // SECTION 2: AKSI KETIKA BATAS TERCAPAI
-                            _buildActionSection(context, app, provider, isDark, primaryColor, cardColor),
+                                // SECTION 2: AKSI KETIKA BATAS TERCAPAI
+                                _buildActionSection(context, app, provider, isDark, primaryColor, cardColor),
 
-                            const SizedBox(height: 12),
+                                const SizedBox(height: 12),
 
-                            // SECTION 3: BLOKIR FITUR SPESIFIK APLIKASI
-                            _buildFeatureBlockSection(context, app, provider, isDark, primaryColor, cardColor),
+                                // SECTION 3: BLOKIR FITUR SPESIFIK APLIKASI
+                                _buildFeatureBlockSection(context, app, provider, isDark, primaryColor, cardColor),
 
-                            const SizedBox(height: 16),
+                                const SizedBox(height: 16),
 
-                            // AUTO-SAVED NOTIFICATION
-                            Center(
-                              child: Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  Icon(
-                                    Icons.check_circle_outline_rounded,
-                                    size: 13,
-                                    color: isDark ? const Color(0xFF777777) : const Color(0xFF888888),
+                                // AUTO-SAVED NOTIFICATION
+                                Center(
+                                  child: Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Icon(
+                                        Icons.check_circle_outline_rounded,
+                                        size: 13,
+                                        color: isDark ? const Color(0xFF777777) : const Color(0xFF888888),
+                                      ),
+                                      const SizedBox(width: 6),
+                                      Text(
+                                        'Setelan otomatis tersimpan',
+                                        style: theme.textTheme.bodyMedium?.copyWith(
+                                          fontSize: 11,
+                                          fontWeight: FontWeight.w500,
+                                          color: isDark ? const Color(0xFF777777) : const Color(0xFF888888),
+                                        ),
+                                      ),
+                                    ],
                                   ),
-                                  const SizedBox(width: 6),
-                                  Text(
-                                    'Setelan otomatis tersimpan',
-                                    style: theme.textTheme.bodyMedium?.copyWith(
-                                      fontSize: 11,
-                                      fontWeight: FontWeight.w500,
-                                      color: isDark ? const Color(0xFF777777) : const Color(0xFF888888),
-                                    ),
+                                ),
+                              ],
+                            ),
+                          ),
+
+                          // Bottom feather fade overlay — mirrors header feather
+                          Positioned(
+                            bottom: 0,
+                            left: 0,
+                            right: 0,
+                            height: 40,
+                            child: IgnorePointer(
+                              child: Container(
+                                decoration: BoxDecoration(
+                                  gradient: LinearGradient(
+                                    begin: Alignment.bottomCenter,
+                                    end: Alignment.topCenter,
+                                    colors: [
+                                      surfaceColor,
+                                      surfaceColor.withValues(alpha: 0.0),
+                                    ],
                                   ),
-                                ],
+                                ),
                               ),
                             ),
-                          ],
-                        ),
+                          ),
+                        ],
                       ),
                     ),
                   ],
@@ -360,7 +386,7 @@ class AppManagementDrawer extends StatelessWidget {
     );
   }
 
-  // --- SECTION 2: AKSI KETIKA BATAS TERCAPAI ---
+  // --- SECTION 2: AKSI KETIKA BATAS TERCAPAI (Horizontal Bento-like Grid) ---
 
   Widget _buildActionSection(
     BuildContext context,
@@ -375,20 +401,36 @@ class AppManagementDrawer extends StatelessWidget {
     final actions = [
       const _ActionOption(
         action: LimitAction.notifyOnly,
-        title: 'Hanya Notifikasi',
-        description: 'Kirim peringatan halus tanpa mengganggu sesi penggunaan.',
+        title: 'Notifikasi',
+        description: 'Peringatan halus',
+        icon: Icons.notifications_none_rounded,
       ),
       const _ActionOption(
         action: LimitAction.popupReminder,
-        title: 'Pop-up Window',
-        description: 'Tampilkan jendela intervensi pengingat kesadaran digital.',
+        title: 'Pop-up',
+        description: 'Jendela intervensi',
+        icon: Icons.filter_none_rounded,
       ),
       const _ActionOption(
         action: LimitAction.blockAndClose,
-        title: 'Langsung Keluar & Blokir',
-        description: 'Tutup paksa aplikasi secara instan dan kunci akses hari ini.',
+        title: 'Blokir',
+        description: 'Keluar & kunci',
+        icon: Icons.block_rounded,
       ),
     ];
+
+    String activeActionLabel;
+    switch (app.actionOnLimit) {
+      case LimitAction.notifyOnly:
+        activeActionLabel = 'Notifikasi Saja';
+        break;
+      case LimitAction.popupReminder:
+        activeActionLabel = 'Pop-up Window';
+        break;
+      case LimitAction.blockAndClose:
+        activeActionLabel = 'Keluar & Blokir';
+        break;
+    }
 
     return Container(
       padding: const EdgeInsets.all(14),
@@ -400,83 +442,113 @@ class AppManagementDrawer extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            'AKSI KETIKA BATAS TERCAPAI',
-            style: theme.textTheme.labelLarge?.copyWith(
-              fontSize: 10,
-              letterSpacing: 1.2,
-              fontWeight: FontWeight.w800,
-            ),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                'AKSI KETIKA BATAS TERCAPAI',
+                style: theme.textTheme.labelLarge?.copyWith(
+                  fontSize: 10,
+                  letterSpacing: 1.2,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+              Text(
+                activeActionLabel,
+                style: TextStyle(
+                  fontSize: 10,
+                  fontWeight: FontWeight.w800,
+                  color: primaryColor,
+                ),
+              ),
+            ],
           ),
-          const SizedBox(height: 10),
+          const SizedBox(height: 12),
 
-          Column(
-            children: actions.map((opt) {
+          // Horizontal Bento Grid
+          Row(
+            children: actions.asMap().entries.map((entry) {
+              final idx = entry.key;
+              final opt = entry.value;
               final isSelected = app.actionOnLimit == opt.action;
 
-              return Padding(
-                padding: const EdgeInsets.only(bottom: 6),
-                child: InkWell(
-                  onTap: () {
-                    HapticFeedback.selectionClick();
-                    provider.updateLimitAction(app.id, opt.action);
-                  },
-                  borderRadius: BorderRadius.circular(14),
-                  child: AnimatedContainer(
-                    duration: const Duration(milliseconds: 150),
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                    decoration: BoxDecoration(
-                      color: isSelected
-                          ? (isDark ? const Color(0xFF1E1E1E) : const Color(0xFFFFFFFF))
-                          : Colors.transparent,
-                      borderRadius: BorderRadius.circular(14),
-                    ),
-                    child: Row(
-                      children: [
-                        Container(
-                          width: 16,
-                          height: 16,
-                          decoration: BoxDecoration(
-                            shape: BoxShape.circle,
-                            color: isSelected ? primaryColor : Colors.transparent,
-                            border: isSelected
-                                ? null
-                                : Border.all(
-                                    color: isDark ? const Color(0xFF444444) : const Color(0xFFCCCCCC),
-                                    width: 1.5,
-                                  ),
-                          ),
-                          child: isSelected
-                              ? Icon(
-                                  Icons.check_rounded,
-                                  size: 11,
-                                  color: isDark ? const Color(0xFF000000) : const Color(0xFFFFFFFF),
-                                )
-                              : null,
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
+              return Expanded(
+                child: Padding(
+                  padding: EdgeInsets.only(
+                    left: idx == 0 ? 0 : 3.5,
+                    right: idx == actions.length - 1 ? 0 : 3.5,
+                  ),
+                  child: InkWell(
+                    onTap: () {
+                      HapticFeedback.selectionClick();
+                      provider.updateLimitAction(app.id, opt.action);
+                    },
+                    borderRadius: BorderRadius.circular(16),
+                    child: AnimatedContainer(
+                      duration: const Duration(milliseconds: 180),
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 12),
+                      decoration: BoxDecoration(
+                        color: isSelected
+                            ? primaryColor
+                            : (isDark ? const Color(0xFF1E1E1E) : const Color(0xFFFFFFFF)),
+                        borderRadius: BorderRadius.circular(16),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
                             children: [
-                              Text(
-                                opt.title,
-                                style: theme.textTheme.labelLarge?.copyWith(
-                                  fontSize: 12,
-                                  fontWeight: isSelected ? FontWeight.w800 : FontWeight.w600,
-                                ),
+                              Icon(
+                                opt.icon,
+                                size: 18,
+                                color: isSelected
+                                    ? (isDark ? const Color(0xFF000000) : const Color(0xFFFFFFFF))
+                                    : primaryColor,
                               ),
-                              const SizedBox(height: 1),
-                              Text(
-                                opt.description,
-                                style: theme.textTheme.bodyMedium?.copyWith(
-                                  fontSize: 10,
+                              AnimatedContainer(
+                                duration: const Duration(milliseconds: 180),
+                                width: 6,
+                                height: 6,
+                                decoration: BoxDecoration(
+                                  shape: BoxShape.circle,
+                                  color: isSelected
+                                      ? (isDark ? const Color(0xFF000000) : const Color(0xFFFFFFFF))
+                                      : Colors.transparent,
                                 ),
                               ),
                             ],
                           ),
-                        ),
-                      ],
+                          const SizedBox(height: 12),
+                          Text(
+                            opt.title,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.w800,
+                              letterSpacing: -0.2,
+                              color: isSelected
+                                  ? (isDark ? const Color(0xFF000000) : const Color(0xFFFFFFFF))
+                                  : primaryColor,
+                            ),
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            opt.description,
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              fontSize: 9,
+                              fontWeight: FontWeight.w500,
+                              height: 1.2,
+                              color: isSelected
+                                  ? (isDark ? const Color(0xFF333333) : const Color(0xFFE0E0E0))
+                                  : (isDark ? const Color(0xFF777777) : const Color(0xFF888888)),
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
                   ),
                 ),
@@ -611,10 +683,12 @@ class _ActionOption {
   final LimitAction action;
   final String title;
   final String description;
+  final IconData icon;
 
   const _ActionOption({
     required this.action,
     required this.title,
     required this.description,
+    required this.icon,
   });
 }

@@ -3,7 +3,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import '../core/localization/app_localizations.dart';
+import '../providers/app_management_provider.dart';
 import '../providers/settings_provider.dart';
+import '../services/limit_enforcement_service.dart';
 import 'manage_app/manage_app_screen.dart';
 import 'screentime/screentime_screen.dart';
 import 'settings/settings_screen.dart';
@@ -23,6 +25,23 @@ class _MainScaffoldState extends State<MainScaffold> {
     ScreentimeScreen(),
     SettingsScreen(),
   ];
+
+  @override
+  void initState() {
+    super.initState();
+    // Start limit enforcement after first frame so context & providers are ready
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      final provider = Provider.of<AppManagementProvider>(context, listen: false);
+      LimitEnforcementService.instance.start(provider, context);
+    });
+  }
+
+  @override
+  void dispose() {
+    LimitEnforcementService.instance.stop();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
