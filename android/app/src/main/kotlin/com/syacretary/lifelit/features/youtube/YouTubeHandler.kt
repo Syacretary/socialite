@@ -152,10 +152,14 @@ class YouTubeHandler : AppFeatureHandler {
     }
 
     private fun isInSearchMode(root: AccessibilityNodeInfo): Boolean {
+        // 1. Search input field or clear button is present on screen
         if (!root.findAccessibilityNodeInfosByViewId("com.google.android.youtube:id/search_edit_text").isNullOrEmpty()) return true
         if (!root.findAccessibilityNodeInfosByViewId("com.google.android.youtube:id/search_clear_button").isNullOrEmpty()) return true
+
+        // 2. Search filter button (only present on search results page)
         if (!root.findAccessibilityNodeInfosByViewId("com.google.android.youtube:id/filter_button").isNullOrEmpty()) return true
 
+        // 3. Toolbar back navigation button while YouTube logo is absent
         val toolbarNodes = root.findAccessibilityNodeInfosByViewId("com.google.android.youtube:id/toolbar")
         if (!toolbarNodes.isNullOrEmpty()) {
             val toolbar = toolbarNodes[0]
@@ -177,7 +181,7 @@ class YouTubeHandler : AppFeatureHandler {
             }
         }
 
-        return !root.findAccessibilityNodeInfosByViewId("com.google.android.youtube:id/query").isNullOrEmpty()
+        return false
     }
 
     private fun calculateFeedBounds(service: AccessibilityService, root: AccessibilityNodeInfo): FeedBounds {
@@ -215,48 +219,62 @@ class YouTubeHandler : AppFeatureHandler {
     }
 
     private fun isHomeTab(root: AccessibilityNodeInfo): Boolean {
+        // If actively typing a query or viewing search results -> NOT home
         if (isInSearchMode(root)) return false
+
+        // If fullscreen Shorts player is active -> NOT home
         if (!root.findAccessibilityNodeInfosByViewId("com.google.android.youtube:id/reel_watch_fragment_root").isNullOrEmpty()) return false
 
-        val otherTabLabels = listOf("Subscriptions", "Subskripsi", "You", "Koleksi", "Akun")
-        for (label in otherTabLabels) {
-            val nodes = root.findAccessibilityNodeInfosByText(label)
-            if (!nodes.isNullOrEmpty()) {
-                for (n in nodes) {
-                    val desc = n.contentDescription?.toString() ?: ""
-                    if (desc.contains("dipilih", ignoreCase = true) || desc.contains("selected", ignoreCase = true)) return false
-                    if (n.isSelected) return false
-                    val p = n.parent
-                    if (p != null && p.isSelected) return false
+        // Check if user is actively watching a video player fullscreen/expanded without navbar
+        val playerView = root.findAccessibilityNodeInfosByViewId("com.google.android.youtube:id/player_fragment_container")
+        val pivotNodes = root.findAccessibilityNodeInfosByViewId("com.google.android.youtube:id/pivot_bar")
+        val hasLogo = !root.findAccessibilityNodeInfosByViewId("com.google.android.youtube:id/youtube_logo").isNullOrEmpty()
+
+        if (!playerView.isNullOrEmpty() && pivotNodes.isNullOrEmpty() && !hasLogo) {
+            // Fullscreen video playback in progress
+            return false
+        }
+
+        // Check bottom navigation bar (pivot_bar)
+        if (!pivotNodes.isNullOrEmpty()) {
+            val pivot = pivotNodes[0]
+            var otherTabSelected = false
+            var homeTabSelected = false
+
+            for (i in 0 until pivot.childCount) {
+                val child = pivot.getChild(i) ?: continue
+                val desc = child.contentDescription?.toString() ?: ""
+                val text = child.text?.toString() ?: ""
+                val isSelected = child.isSelected ||
+                        desc.contains("dipilih", ignoreCase = true) ||
+                        desc.contains("selected", ignoreCase = true)
+
+                val isHome = desc.contains("Beranda", ignoreCase = true) ||
+                        desc.contains("Home", ignoreCase = true) ||
+                        text.contains("Beranda", ignoreCase = true) ||
+                        text.contains("Home", ignoreCase = true) ||
+                        (i == 0)
+
+                if (isSelected) {
+                    if (isHome) {
+                        homeTabSelected = true
+                    } else {
+                        otherTabSelected = true
+                    }
                 }
             }
+
+            if (otherTabSelected) return false
+            if (homeTabSelected) return true
+
+            // Pivot bar is present and no other tab is explicitly selected:
+            // Home is the default active state in YouTube!
+            return true
         }
 
-        val shortsNodes = root.findAccessibilityNodeInfosByText("Shorts")
-        if (!shortsNodes.isNullOrEmpty()) {
-            for (n in shortsNodes) {
-                val desc = n.contentDescription?.toString() ?: ""
-                if (desc.contains("dipilih", ignoreCase = true) || desc.contains("selected", ignoreCase = true)) return false
-                if (n.isSelected) return false
-                val p = n.parent
-                if (p != null && p.isSelected) return false
-            }
-        }
+        // Secondary confirmation: presence of YouTube logo in top toolbar
+        if (hasLogo) return true
 
-        val homeLabels = listOf("Beranda", "Home")
-        for (label in homeLabels) {
-            val nodes = root.findAccessibilityNodeInfosByText(label)
-            if (!nodes.isNullOrEmpty()) {
-                for (n in nodes) {
-                    val desc = n.contentDescription?.toString() ?: ""
-                    if (desc.contains("dipilih", ignoreCase = true) || desc.contains("selected", ignoreCase = true)) return true
-                    if (n.isSelected) return true
-                    val p = n.parent
-                    if (p != null && p.isSelected) return true
-                }
-            }
-        }
-
-        return !root.findAccessibilityNodeInfosByViewId("com.google.android.youtube:id/pivot_bar").isNullOrEmpty()
+        return false
     }
 }

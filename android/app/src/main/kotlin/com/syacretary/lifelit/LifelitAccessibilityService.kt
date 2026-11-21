@@ -37,6 +37,33 @@ class LifelitAccessibilityService : AccessibilityService() {
 
         private val activeRules = mutableMapOf<String, MutableSet<String>>()
 
+        /**
+         * Transient system packages that must NOT cause overlays to hide.
+         * Includes heads-up notification popups, quick settings, volume sliders,
+         * ColorOS/Realme Smart Sidebar, Samsung Edge Panel, system dialogs, and keyboards.
+         */
+        private val TRANSIENT_SYSTEM_PACKAGES = setOf(
+            "com.android.systemui",
+            "com.oplus.smartsidebar",
+            "com.coloros.smartsidebar",
+            "com.oplus.sidebar",
+            "com.coloros.floatlet",
+            "com.oplus.screenshot",
+            "com.coloros.screenrecorder",
+            "com.oplus.safecenter",
+            "com.oplus.sublauncher",
+            "com.oplus.gesture",
+            "com.samsung.android.app.cocktailbarservice",
+            "com.samsung.android.sidebarservice",
+            "com.miui.freeform",
+            "com.miui.notification",
+            "com.huawei.android.internal.app",
+            "android",
+            "com.google.android.inputmethod.latin",
+            "com.touchtype.swiftkey",
+            "com.samsung.android.honeyboard"
+        )
+
         fun isServiceRunning(): Boolean = instance != null
 
         fun syncRules(context: Context, rules: Map<String, List<String>>) {
@@ -96,12 +123,19 @@ class LifelitAccessibilityService : AccessibilityService() {
         if (event == null) return
         val pkg = event.packageName?.toString() ?: return
 
-        // Ignore our own overlay window
+        // 1. Ignore our own overlay window
         if (pkg.contains("com.syacretary.lifelit")) return
+
+        // 2. Ignore transient system overlays (smart edge/sidebar, heads-up notifications, volume slider, keyboard).
+        // This prevents users from dismissing the overlay by triggering smart edge panels or notifications.
+        val isTransient = TRANSIENT_SYSTEM_PACKAGES.any { pkg.contains(it, ignoreCase = true) }
+        if (isTransient) {
+            return
+        }
 
         val handler = findHandlerForPackage(pkg)
 
-        // 1. If exiting to an unmanaged package, immediately hide overlay
+        // 3. If genuinely exiting to another user app (e.g. Launcher, Settings, WhatsApp), hide overlay
         if (event.eventType == AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED) {
             if (handler == null) {
                 hideOverlayImmediate()
@@ -111,7 +145,7 @@ class LifelitAccessibilityService : AccessibilityService() {
 
         if (handler == null) return
 
-        // 2. Fast redirect check for Shorts / Reels / Stories
+        // 4. Fast redirect check for Shorts / Reels / Stories / Home
         val root = rootInActiveWindow
         if (root != null) {
             val rules = getRulesForPackage(pkg)
@@ -124,7 +158,7 @@ class LifelitAccessibilityService : AccessibilityService() {
             }
         }
 
-        // 3. Debounced layout and state evaluation
+        // 5. Debounced layout and state evaluation
         scheduleEvaluation(100L)
     }
 
@@ -186,7 +220,7 @@ class LifelitAccessibilityService : AccessibilityService() {
     }
 
     private fun evaluateCurrentState() {
-        val root = rootInActiveWindow ?: return
+        val root = getActiveManagedRoot() ?: return
         val activePkg = root.packageName?.toString() ?: return
         val handler = findHandlerForPackage(activePkg) ?: run {
             hideOverlayImmediate()
@@ -208,5 +242,39 @@ class LifelitAccessibilityService : AccessibilityService() {
             scheduleHide = { delayMs -> scheduleHideOverlay(delayMs) },
             hideImmediate = { hideOverlayImmediate() }
         )
+    }
+
+    /**
+     * Resolves the active root node for managed apps while remaining immune
+     * to transient system windows (smart sidebar, floating tools, notification popups).
+     */
+    private fun getActiveManagedRoot(): android.view.accessibility.AccessibilityNodeInfo? {
+        val root = rootInActiveWindow
+        val pkg = root?.packageName?.toString() ?: ""
+
+        // If the focused window belongs to a managed app, use it directly
+        if (findHandlerForPackage(pkg) != null) {
+            return root
+        }
+
+        // If the focused window is a transient system element (smart edge, heads-up notification, etc.)
+        if (TRANSIENT_SYSTEM_PACKAGES.any { pkg.contains(it, ignoreCase = true) }) {
+            try {
+                val windowList = windows
+                for (w in windowList) {
+                    val wRoot = w.root ?: continue
+                    val wPkg = wRoot.packageName?.toString() ?: ""
+                    if (findHandlerForPackage(wPkg) != null) {
+                        return wRoot
+                    }
+                }
+            } catch (e: Exception) {
+                return null
+            }
+            // Transient window is active and managed app is underneath: return null so overlay remains intact!
+            return null
+        }
+
+        return root
     }
 }
