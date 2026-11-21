@@ -19,9 +19,7 @@ class ScreentimeScreen extends StatelessWidget {
     final screentimeProvider = Provider.of<ScreentimeProvider>(context);
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
-
     final primaryColor = isDark ? const Color(0xFFFFFFFF) : const Color(0xFF000000);
-    final borderColor = isDark ? const Color(0xFF262626) : const Color(0xFFE5E5E5);
 
     final totalMinutes = screentimeProvider.calculateTotalUsageMinutes(appsProvider);
     final totalFormatted = screentimeProvider.formatMinutes(
@@ -39,65 +37,38 @@ class ScreentimeScreen extends StatelessWidget {
             constraints: const BoxConstraints(maxWidth: 680),
             child: Column(
               children: [
-                CustomHeader(
-                  title: loc.get('screentimeTitle'),
-                  subtitle: loc.get('screentimeSubtitle'),
-                  trailing: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                    decoration: BoxDecoration(
-                      color: Colors.transparent, // Invisible
-                      borderRadius: BorderRadius.circular(16),
-                      border: Border.all(color: borderColor, width: 1.0),
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Container(
-                          width: 5,
-                          height: 5,
-                          decoration: BoxDecoration(
-                            color: primaryColor,
-                            shape: BoxShape.circle,
-                          ),
-                        ),
-                        const SizedBox(width: 6),
-                        Text(
-                          'Live Tracker',
-                          style: theme.textTheme.labelLarge?.copyWith(
-                            fontSize: 11,
-                            fontWeight: FontWeight.w700,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
+                // Clean Header without subtitle and without trailing chips
+                CustomHeader(title: loc.get('screentimeTitle')),
 
+                // Feather scroll wrapper ensures content gracefully fades away before header
                 Expanded(
-                  child: SingleChildScrollView(
-                    physics: const BouncingScrollPhysics(),
-                    padding: const EdgeInsets.fromLTRB(16, 8, 16, 120),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        // PERMISSION CARD
-                        _buildPermissionBanner(context, loc, isDark, screentimeProvider, settings, primaryColor, borderColor),
+                  child: FeatherScrollWrapper(
+                    child: SingleChildScrollView(
+                      physics: const BouncingScrollPhysics(),
+                      padding: const EdgeInsets.fromLTRB(16, 4, 16, 120),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min, // Hug content tightly
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          // PERMISSION CARD (If needed)
+                          _buildPermissionBanner(context, loc, isDark, screentimeProvider, settings, primaryColor),
 
-                        const SizedBox(height: 16),
+                          const SizedBox(height: 10),
 
-                        // HERO STAT CARD (Pure Monochrome & Invisible Background)
-                        _buildHeroStatCard(context, loc, isDark, totalFormatted, totalMinutes, primaryColor, borderColor),
+                          // HERO STAT CARD (Compact, No Outlines)
+                          _buildHeroStatCard(context, loc, isDark, totalFormatted, totalMinutes, primaryColor),
 
-                        const SizedBox(height: 20),
+                          const SizedBox(height: 12),
 
-                        // WEEKLY 7-DAY MINI BAR CHART (Pure Monochrome)
-                        _buildWeeklyTrendCard(context, loc, isDark, screentimeProvider, primaryColor, borderColor),
+                          // WEEKLY 7-DAY MINI BAR CHART (Compact, No Outlines)
+                          _buildWeeklyTrendCard(context, loc, isDark, screentimeProvider, primaryColor),
 
-                        const SizedBox(height: 20),
+                          const SizedBox(height: 12),
 
-                        // BREAKDOWN APPS LIST
-                        _buildAppBreakdownList(context, loc, isDark, appsProvider, totalMinutes, primaryColor, borderColor),
-                      ],
+                          // BREAKDOWN APPS LIST (Authentic App Logos, No Outlines)
+                          _buildAppBreakdownList(context, loc, isDark, appsProvider, totalMinutes, primaryColor),
+                        ],
+                      ),
                     ),
                   ),
                 ),
@@ -116,32 +87,27 @@ class ScreentimeScreen extends StatelessWidget {
     ScreentimeProvider screentimeProvider,
     SettingsProvider settings,
     Color primaryColor,
-    Color borderColor,
   ) {
     final theme = Theme.of(context);
     final hasPermission = screentimeProvider.hasUsagePermission || settings.usagePermissionGranted;
 
     if (hasPermission) {
       return Container(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
         decoration: BoxDecoration(
-          color: Colors.transparent, // Invisible
-          borderRadius: BorderRadius.circular(18),
-          border: Border.all(color: borderColor, width: 1.0),
+          color: isDark ? const Color(0xFF0F0F0F) : const Color(0xFFF1F2F4),
+          borderRadius: BorderRadius.circular(16),
+          // NO OUTLINES
         ),
         child: Row(
           children: [
-            Icon(
-              Icons.check_circle_outline_rounded,
-              color: primaryColor,
-              size: 16,
-            ),
-            const SizedBox(width: 10),
+            Icon(Icons.check_circle_outline_rounded, color: primaryColor, size: 15),
+            const SizedBox(width: 8),
             Expanded(
               child: Text(
                 'Akses Screentime aktif',
                 style: theme.textTheme.bodyMedium?.copyWith(
-                  fontSize: 12,
+                  fontSize: 11,
                   fontWeight: FontWeight.w600,
                   color: primaryColor,
                 ),
@@ -155,7 +121,7 @@ class ScreentimeScreen extends StatelessWidget {
               child: Text(
                 'Ubah',
                 style: theme.textTheme.labelLarge?.copyWith(
-                  fontSize: 11,
+                  fontSize: 10,
                   decoration: TextDecoration.underline,
                 ),
               ),
@@ -166,28 +132,17 @@ class ScreentimeScreen extends StatelessWidget {
     }
 
     return Container(
-      padding: const EdgeInsets.all(18),
+      padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: Colors.transparent, // Invisible
-        borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: primaryColor, width: 1.2),
+        color: isDark ? const Color(0xFF141414) : const Color(0xFFEBEBEB),
+        borderRadius: BorderRadius.circular(20),
+        // NO OUTLINES
       ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Container(
-            padding: const EdgeInsets.all(8),
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              border: Border.all(color: primaryColor, width: 1.0),
-            ),
-            child: Icon(
-              Icons.lock_outline_rounded,
-              color: primaryColor,
-              size: 18,
-            ),
-          ),
-          const SizedBox(width: 14),
+          Icon(Icons.lock_outline_rounded, color: primaryColor, size: 16),
+          const SizedBox(width: 10),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -195,19 +150,16 @@ class ScreentimeScreen extends StatelessWidget {
                 Text(
                   loc.get('permissionCardTitle'),
                   style: theme.textTheme.labelLarge?.copyWith(
-                    fontSize: 13,
+                    fontSize: 12,
                     fontWeight: FontWeight.w800,
                   ),
                 ),
-                const SizedBox(height: 4),
+                const SizedBox(height: 2),
                 Text(
                   loc.get('permissionCardSubtitle'),
-                  style: theme.textTheme.bodyMedium?.copyWith(
-                    fontSize: 11,
-                    height: 1.4,
-                  ),
+                  style: theme.textTheme.bodyMedium?.copyWith(fontSize: 10),
                 ),
-                const SizedBox(height: 12),
+                const SizedBox(height: 8),
                 ElevatedButton(
                   onPressed: () {
                     HapticFeedback.mediumImpact();
@@ -217,16 +169,14 @@ class ScreentimeScreen extends StatelessWidget {
                   style: ElevatedButton.styleFrom(
                     backgroundColor: primaryColor,
                     foregroundColor: isDark ? const Color(0xFF000000) : const Color(0xFFFFFFFF),
-                    padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 8),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(14),
-                    ),
+                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                     elevation: 0,
                   ),
                   child: Text(
                     loc.get('grantPermission'),
                     style: TextStyle(
-                      fontSize: 12,
+                      fontSize: 11,
                       fontWeight: FontWeight.w800,
                       color: isDark ? const Color(0xFF000000) : const Color(0xFFFFFFFF),
                     ),
@@ -247,19 +197,19 @@ class ScreentimeScreen extends StatelessWidget {
     String totalFormatted,
     int totalMinutes,
     Color primaryColor,
-    Color borderColor,
   ) {
     final theme = Theme.of(context);
-    final ratio = (totalMinutes / 360).clamp(0.0, 1.0); // 6h ceiling baseline
+    final ratio = (totalMinutes / 360).clamp(0.0, 1.0);
 
     return Container(
-      padding: const EdgeInsets.all(24),
+      padding: const EdgeInsets.symmetric(vertical: 18, horizontal: 18),
       decoration: BoxDecoration(
-        color: Colors.transparent, // INVISIBLE BACKGROUND
-        borderRadius: BorderRadius.circular(30),
-        border: Border.all(color: borderColor, width: 1.0),
+        color: isDark ? const Color(0xFF0A0A0A) : const Color(0xFFF3F4F6),
+        borderRadius: BorderRadius.circular(24),
+        // NO OUTLINES
       ),
       child: Column(
+        mainAxisSize: MainAxisSize.min, // Hug content
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
@@ -268,39 +218,28 @@ class ScreentimeScreen extends StatelessWidget {
               Text(
                 loc.get('todayUsage'),
                 style: theme.textTheme.labelLarge?.copyWith(
-                  fontSize: 11,
+                  fontSize: 10,
                   letterSpacing: 1.5,
                   fontWeight: FontWeight.w800,
                 ),
               ),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(14),
-                  border: Border.all(color: borderColor, width: 1.0),
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(
-                      Icons.trending_down_rounded,
-                      size: 13,
-                      color: primaryColor,
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(Icons.trending_down_rounded, size: 12, color: primaryColor),
+                  const SizedBox(width: 3),
+                  Text(
+                    loc.get('usageComparison'),
+                    style: theme.textTheme.labelLarge?.copyWith(
+                      fontSize: 10,
+                      fontWeight: FontWeight.w700,
                     ),
-                    const SizedBox(width: 4),
-                    Text(
-                      loc.get('usageComparison'),
-                      style: theme.textTheme.labelLarge?.copyWith(
-                        fontSize: 11,
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                  ],
-                ),
+                  ),
+                ],
               ),
             ],
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: 8),
 
           FittedBox(
             fit: BoxFit.scaleDown,
@@ -308,45 +247,41 @@ class ScreentimeScreen extends StatelessWidget {
             child: Text(
               totalFormatted,
               style: theme.textTheme.displayLarge?.copyWith(
-                fontSize: 54,
+                fontSize: 48,
                 fontWeight: FontWeight.w900,
                 letterSpacing: -2.0,
                 height: 1.0,
               ),
             ),
           ),
-          const SizedBox(height: 20),
+          const SizedBox(height: 14),
 
-          // PURE MONOCHROME PROGRESS TRACK
+          // Track
           ClipRRect(
             borderRadius: BorderRadius.circular(10),
             child: Container(
-              height: 6,
+              height: 5,
               width: double.infinity,
-              color: isDark ? const Color(0xFF262626) : const Color(0xFFE5E5E5),
+              color: isDark ? const Color(0xFF1E1E1E) : const Color(0xFFE2E4E8),
               child: FractionallySizedBox(
                 alignment: Alignment.centerLeft,
                 widthFactor: ratio,
-                child: Container(
-                  color: primaryColor,
-                ),
+                child: Container(color: primaryColor),
               ),
             ),
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: 8),
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Text(
                 loc.get('dailyGoal'),
-                style: theme.textTheme.bodyMedium?.copyWith(
-                  fontSize: 12,
-                ),
+                style: theme.textTheme.bodyMedium?.copyWith(fontSize: 11),
               ),
               Text(
                 '${(ratio * 100).toInt()}% terpakai',
                 style: theme.textTheme.bodyMedium?.copyWith(
-                  fontSize: 12,
+                  fontSize: 11,
                   fontWeight: FontWeight.w700,
                   color: primaryColor,
                 ),
@@ -364,19 +299,19 @@ class ScreentimeScreen extends StatelessWidget {
     bool isDark,
     ScreentimeProvider provider,
     Color primaryColor,
-    Color borderColor,
   ) {
     final theme = Theme.of(context);
     final days = provider.weeklyTrend;
 
     return Container(
-      padding: const EdgeInsets.all(22),
+      padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 16),
       decoration: BoxDecoration(
-        color: Colors.transparent, // INVISIBLE BACKGROUND
-        borderRadius: BorderRadius.circular(28),
-        border: Border.all(color: borderColor, width: 1.0),
+        color: isDark ? const Color(0xFF0A0A0A) : const Color(0xFFF3F4F6),
+        borderRadius: BorderRadius.circular(22),
+        // NO OUTLINES
       ),
       child: Column(
+        mainAxisSize: MainAxisSize.min, // Hug content
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
@@ -385,21 +320,17 @@ class ScreentimeScreen extends StatelessWidget {
               Text(
                 loc.get('weeklyOverview'),
                 style: theme.textTheme.labelLarge?.copyWith(
-                  fontSize: 11,
-                  letterSpacing: 1.4,
+                  fontSize: 10,
+                  letterSpacing: 1.2,
                   fontWeight: FontWeight.w800,
                 ),
               ),
-              Icon(
-                Icons.bar_chart_rounded,
-                size: 16,
-                color: primaryColor,
-              ),
+              Icon(Icons.bar_chart_rounded, size: 14, color: primaryColor),
             ],
           ),
-          const SizedBox(height: 24),
+          const SizedBox(height: 14),
           SizedBox(
-            height: 110,
+            height: 75, // Compact vertical size
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceEvenly,
               crossAxisAlignment: CrossAxisAlignment.end,
@@ -413,26 +344,24 @@ class ScreentimeScreen extends StatelessWidget {
                     mainAxisAlignment: MainAxisAlignment.end,
                     children: [
                       Container(
-                        width: 22,
-                        height: (75 * day.ratioOfMax).clamp(14.0, 75.0),
+                        width: 18,
+                        height: (50 * day.ratioOfMax).clamp(10.0, 50.0),
                         decoration: BoxDecoration(
-                          color: isToday ? primaryColor : Colors.transparent,
-                          borderRadius: BorderRadius.circular(8),
-                          border: Border.all(
-                            color: isToday
-                                ? primaryColor
-                                : (isDark ? const Color(0xFF333333) : const Color(0xFFD4D4D4)),
-                            width: 1.0,
-                          ),
+                          color: isToday
+                              ? primaryColor
+                              : (isDark ? const Color(0xFF222222) : const Color(0xFFDDDDDD)),
+                          borderRadius: BorderRadius.circular(6),
                         ),
                       ),
-                      const SizedBox(height: 8),
+                      const SizedBox(height: 6),
                       Text(
                         day.dayName,
                         style: theme.textTheme.labelLarge?.copyWith(
-                          fontSize: 11,
+                          fontSize: 10,
                           fontWeight: isToday ? FontWeight.w800 : FontWeight.w500,
-                          color: isToday ? primaryColor : (isDark ? const Color(0xFF888888) : const Color(0xFF737373)),
+                          color: isToday
+                              ? primaryColor
+                              : (isDark ? const Color(0xFF777777) : const Color(0xFF888888)),
                         ),
                       ),
                     ],
@@ -453,7 +382,6 @@ class ScreentimeScreen extends StatelessWidget {
     AppManagementProvider provider,
     int totalMinutes,
     Color primaryColor,
-    Color borderColor,
   ) {
     final theme = Theme.of(context);
     final sortedApps = List.of(provider.allApps)
@@ -462,29 +390,30 @@ class ScreentimeScreen extends StatelessWidget {
     final maxAppMinutes = sortedApps.first.usageMinutesToday;
 
     return Container(
-      padding: const EdgeInsets.all(22),
+      padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 16),
       decoration: BoxDecoration(
-        color: Colors.transparent, // INVISIBLE BACKGROUND
-        borderRadius: BorderRadius.circular(28),
-        border: Border.all(color: borderColor, width: 1.0),
+        color: isDark ? const Color(0xFF0A0A0A) : const Color(0xFFF3F4F6),
+        borderRadius: BorderRadius.circular(24),
+        // NO OUTLINES
       ),
       child: Column(
+        mainAxisSize: MainAxisSize.min, // Hug content
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
             loc.get('topUsedApps'),
             style: theme.textTheme.labelLarge?.copyWith(
-              fontSize: 11,
-              letterSpacing: 1.4,
+              fontSize: 10,
+              letterSpacing: 1.2,
               fontWeight: FontWeight.w800,
             ),
           ),
-          const SizedBox(height: 18),
+          const SizedBox(height: 12),
           ListView.separated(
             shrinkWrap: true,
             physics: const NeverScrollableScrollPhysics(),
             itemCount: sortedApps.length,
-            separatorBuilder: (_, __) => const SizedBox(height: 16),
+            separatorBuilder: (_, __) => const SizedBox(height: 10),
             itemBuilder: (context, index) {
               final app = sortedApps[index];
               final ratio = maxAppMinutes > 0 ? (app.usageMinutesToday / maxAppMinutes) : 0.0;
@@ -498,24 +427,20 @@ class ScreentimeScreen extends StatelessWidget {
                     onToggleRestriction: () => provider.toggleRestriction(app.id),
                   );
                 },
-                borderRadius: BorderRadius.circular(16),
+                borderRadius: BorderRadius.circular(14),
                 child: Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 4),
+                  padding: const EdgeInsets.symmetric(vertical: 3),
                   child: Row(
                     children: [
-                      Container(
-                        width: 38,
-                        height: 38,
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          border: Border.all(
-                            color: isDark ? const Color(0xFF333333) : const Color(0xFFCCCCCC),
-                            width: 1.0,
-                          ),
+                      // Authentic Brand Logo
+                      SizedBox(
+                        width: 32,
+                        height: 32,
+                        child: Center(
+                          child: app.buildLogo(size: 26),
                         ),
-                        child: Icon(app.icon, color: primaryColor, size: 18),
                       ),
-                      const SizedBox(width: 14),
+                      const SizedBox(width: 12),
                       Expanded(
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
@@ -528,20 +453,20 @@ class ScreentimeScreen extends StatelessWidget {
                                     Text(
                                       app.name,
                                       style: theme.textTheme.labelLarge?.copyWith(
-                                        fontSize: 13,
+                                        fontSize: 12,
                                         fontWeight: FontWeight.w700,
                                       ),
                                     ),
                                     if (app.isRestricted) ...[
                                       const SizedBox(width: 6),
                                       Container(
-                                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                        padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
                                         decoration: BoxDecoration(
-                                          border: Border.all(color: primaryColor, width: 0.8),
-                                          borderRadius: BorderRadius.circular(8),
+                                          color: isDark ? const Color(0xFF222222) : const Color(0xFFE2E4E8),
+                                          borderRadius: BorderRadius.circular(6),
                                         ),
                                         child: Text(
-                                          'DIBATASI',
+                                          'BATAS',
                                           style: TextStyle(
                                             fontSize: 8,
                                             fontWeight: FontWeight.w800,
@@ -556,25 +481,23 @@ class ScreentimeScreen extends StatelessWidget {
                                 Text(
                                   app.formattedUsage,
                                   style: theme.textTheme.labelLarge?.copyWith(
-                                    fontSize: 12,
+                                    fontSize: 11,
                                     fontWeight: FontWeight.w800,
                                   ),
                                 ),
                               ],
                             ),
-                            const SizedBox(height: 6),
+                            const SizedBox(height: 5),
                             ClipRRect(
                               borderRadius: BorderRadius.circular(4),
                               child: Container(
-                                height: 4,
+                                height: 3,
                                 width: double.infinity,
-                                color: isDark ? const Color(0xFF262626) : const Color(0xFFE5E5E5),
+                                color: isDark ? const Color(0xFF1E1E1E) : const Color(0xFFE2E4E8),
                                 child: FractionallySizedBox(
                                   alignment: Alignment.centerLeft,
                                   widthFactor: ratio,
-                                  child: Container(
-                                    color: primaryColor,
-                                  ),
+                                  child: Container(color: primaryColor),
                                 ),
                               ),
                             ),

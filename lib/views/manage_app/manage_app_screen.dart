@@ -18,7 +18,6 @@ class ManageAppScreen extends StatelessWidget {
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
     final primaryColor = isDark ? const Color(0xFFFFFFFF) : const Color(0xFF000000);
-    final borderColor = isDark ? const Color(0xFF262626) : const Color(0xFFE5E5E5);
 
     return Scaffold(
       backgroundColor: Colors.transparent,
@@ -29,92 +28,56 @@ class ManageAppScreen extends StatelessWidget {
             constraints: const BoxConstraints(maxWidth: 680),
             child: Column(
               children: [
-                // Header with 3-second glanceability
-                CustomHeader(
-                  title: loc.get('manageTitle'),
-                  subtitle: loc.get('manageSubtitle'),
-                  trailing: Consumer<AppManagementProvider>(
-                    builder: (context, provider, _) {
-                      return Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-                        decoration: BoxDecoration(
-                          color: Colors.transparent, // Invisible background
-                          borderRadius: BorderRadius.circular(20),
-                          border: Border.all(color: borderColor, width: 1.0),
-                        ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Icon(
-                              Icons.lock_outline_rounded,
-                              size: 14,
-                              color: primaryColor,
-                            ),
-                            const SizedBox(width: 6),
-                            Text(
-                              '${provider.restrictedApps.length} ${loc.get('appsCount')}',
-                              style: theme.textTheme.labelLarge?.copyWith(
-                                fontSize: 12,
-                                fontWeight: FontWeight.w700,
-                              ),
-                            ),
-                          ],
-                        ),
-                      );
-                    },
-                  ),
-                ),
+                // Clean Header without subtitle and without trailing chips
+                CustomHeader(title: loc.get('manageTitle')),
 
+                // Feather scroll wrapper ensures content gracefully fades away before header
                 Expanded(
-                  child: SingleChildScrollView(
-                    physics: const BouncingScrollPhysics(),
-                    padding: const EdgeInsets.fromLTRB(16, 8, 16, 120),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        // ZONA DIBATASI (RESTRICTED ZONE DROP TARGET)
-                        _buildRestrictedZone(context, loc, isDark, primaryColor, borderColor),
+                  child: FeatherScrollWrapper(
+                    child: SingleChildScrollView(
+                      physics: const BouncingScrollPhysics(),
+                      padding: const EdgeInsets.fromLTRB(16, 4, 16, 120),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min, // Hug content tightly
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          // ZONA DIBATASI (RESTRICTED ZONE DROP TARGET)
+                          _buildRestrictedZone(context, loc, isDark, primaryColor),
 
-                        const SizedBox(height: 20),
+                          const SizedBox(height: 12),
 
-                        // VISUAL DRAG CONNECTOR HINT
-                        Center(
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
-                            decoration: BoxDecoration(
-                              color: Colors.transparent,
-                              borderRadius: BorderRadius.circular(16),
-                              border: Border.all(
-                                color: isDark ? const Color(0xFF1F1F1F) : const Color(0xFFEFEFEF),
-                                width: 1.0,
-                              ),
-                            ),
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Icon(
-                                  Icons.swap_vert_rounded,
-                                  size: 15,
-                                  color: isDark ? const Color(0xFF888888) : const Color(0xFF737373),
-                                ),
-                                const SizedBox(width: 6),
-                                Text(
-                                  loc.get('dragHint'),
-                                  style: theme.textTheme.bodyMedium?.copyWith(
-                                    fontSize: 11,
-                                    fontWeight: FontWeight.w600,
+                          // VISUAL DRAG CONNECTOR HINT
+                          Center(
+                            child: Padding(
+                              padding: const EdgeInsets.symmetric(vertical: 4),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Icon(
+                                    Icons.swap_vert_rounded,
+                                    size: 14,
+                                    color: isDark ? const Color(0xFF666666) : const Color(0xFF999999),
                                   ),
-                                ),
-                              ],
+                                  const SizedBox(width: 4),
+                                  Text(
+                                    loc.get('dragHint'),
+                                    style: theme.textTheme.bodyMedium?.copyWith(
+                                      fontSize: 10,
+                                      fontWeight: FontWeight.w600,
+                                      color: isDark ? const Color(0xFF666666) : const Color(0xFF999999),
+                                    ),
+                                  ),
+                                ],
+                              ),
                             ),
                           ),
-                        ),
 
-                        const SizedBox(height: 20),
+                          const SizedBox(height: 12),
 
-                        // ZONA APLIKASI BEBAS (AVAILABLE APPS LIST & DROP TARGET)
-                        _buildAvailableZone(context, loc, isDark, primaryColor, borderColor),
-                      ],
+                          // ZONA APLIKASI BEBAS (AVAILABLE APPS LIST & DROP TARGET)
+                          _buildAvailableZone(context, loc, isDark, primaryColor),
+                        ],
+                      ),
                     ),
                   ),
                 ),
@@ -131,7 +94,6 @@ class ManageAppScreen extends StatelessWidget {
     AppLocalizations loc,
     bool isDark,
     Color primaryColor,
-    Color borderColor,
   ) {
     final theme = Theme.of(context);
     final provider = Provider.of<AppManagementProvider>(context);
@@ -154,106 +116,63 @@ class ManageAppScreen extends StatelessWidget {
         final isHovered = candidateData.isNotEmpty || provider.isDraggingOverRestrictedZone;
 
         return AnimatedContainer(
-          duration: const Duration(milliseconds: 250),
+          duration: const Duration(milliseconds: 200),
           curve: Curves.easeOutCubic,
-          padding: const EdgeInsets.all(20),
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
           decoration: BoxDecoration(
-            color: Colors.transparent, // INVISIBLE BACKGROUND
-            borderRadius: BorderRadius.circular(28),
-            border: Border.all(
-              color: isHovered ? primaryColor : borderColor,
-              width: isHovered ? 1.8 : 1.0,
-            ),
+            color: isHovered
+                ? (isDark ? const Color(0xFF141414) : const Color(0xFFEBEBEB))
+                : (isDark ? const Color(0xFF0A0A0A) : const Color(0xFFF3F4F6)),
+            borderRadius: BorderRadius.circular(24),
+            // NO OUTLINES
           ),
           child: Column(
+            mainAxisSize: MainAxisSize.min, // Hug content
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Row(
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.all(7),
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          border: Border.all(color: primaryColor, width: 1.0),
-                        ),
-                        child: Icon(
-                          Icons.shield_outlined,
-                          size: 15,
-                          color: primaryColor,
-                        ),
-                      ),
-                      const SizedBox(width: 10),
-                      Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            loc.get('restrictedZoneTitle'),
-                            style: theme.textTheme.labelLarge?.copyWith(
-                              fontSize: 12,
-                              fontWeight: FontWeight.w800,
-                              letterSpacing: 1.0,
-                            ),
-                          ),
-                          Text(
-                            loc.get('restrictedZoneSubtitle'),
-                            style: theme.textTheme.bodyMedium?.copyWith(
-                              fontSize: 11,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ],
-                  ),
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                    decoration: BoxDecoration(
-                      color: primaryColor,
-                      borderRadius: BorderRadius.circular(12),
+                  Text(
+                    loc.get('restrictedZoneTitle'),
+                    style: theme.textTheme.labelLarge?.copyWith(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w800,
+                      letterSpacing: 1.0,
                     ),
-                    child: Text(
-                      '${provider.restrictedApps.length}',
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: isDark ? const Color(0xFF000000) : const Color(0xFFFFFFFF),
-                        fontWeight: FontWeight.w800,
-                      ),
+                  ),
+                  Text(
+                    '${provider.restrictedApps.length}',
+                    style: TextStyle(
+                      fontSize: 11,
+                      color: primaryColor,
+                      fontWeight: FontWeight.w800,
                     ),
                   ),
                 ],
               ),
-              const SizedBox(height: 18),
+              const SizedBox(height: 12),
 
-              // Content of restricted zone
+              // Content of restricted zone (Compact, no vertical oversize)
               if (provider.restrictedApps.isEmpty)
                 Container(
                   width: double.infinity,
-                  padding: const EdgeInsets.symmetric(vertical: 36),
+                  padding: const EdgeInsets.symmetric(vertical: 14),
                   alignment: Alignment.center,
-                  decoration: BoxDecoration(
-                    color: Colors.transparent,
-                    borderRadius: BorderRadius.circular(20),
-                    border: Border.all(
-                      color: isDark ? const Color(0xFF1E1E1E) : const Color(0xFFEBEBEB),
-                      width: 1.0,
-                    ),
-                  ),
-                  child: Column(
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
                     children: [
                       Icon(
                         Icons.add_circle_outline_rounded,
-                        size: 28,
-                        color: isDark ? const Color(0xFF666666) : const Color(0xFF999999),
+                        size: 16,
+                        color: isDark ? const Color(0xFF555555) : const Color(0xFFAAAAAA),
                       ),
-                      const SizedBox(height: 10),
+                      const SizedBox(width: 8),
                       Text(
-                        loc.get('restrictedZoneEmpty'),
-                        textAlign: TextAlign.center,
+                        loc.get('restrictedZoneEmpty').replaceAll('\n', ' '),
                         style: theme.textTheme.bodyMedium?.copyWith(
-                          fontSize: 12,
-                          height: 1.5,
+                          fontSize: 11,
+                          color: isDark ? const Color(0xFF555555) : const Color(0xFFAAAAAA),
                         ),
                       ),
                     ],
@@ -267,10 +186,10 @@ class ManageAppScreen extends StatelessWidget {
                       physics: const NeverScrollableScrollPhysics(),
                       itemCount: provider.restrictedApps.length,
                       gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
-                        maxCrossAxisExtent: 120,
-                        mainAxisSpacing: 12,
-                        crossAxisSpacing: 12,
-                        childAspectRatio: 0.90,
+                        maxCrossAxisExtent: 110,
+                        mainAxisSpacing: 10,
+                        crossAxisSpacing: 10,
+                        childAspectRatio: 0.95,
                       ),
                       itemBuilder: (context, index) {
                         final app = provider.restrictedApps[index];
@@ -280,7 +199,6 @@ class ManageAppScreen extends StatelessWidget {
                           isRestricted: true,
                           isDark: isDark,
                           primaryColor: primaryColor,
-                          borderColor: borderColor,
                           onTap: () {
                             SmoothAppSheet.show(
                               context: context,
@@ -310,7 +228,6 @@ class ManageAppScreen extends StatelessWidget {
     AppLocalizations loc,
     bool isDark,
     Color primaryColor,
-    Color borderColor,
   ) {
     final theme = Theme.of(context);
     final provider = Provider.of<AppManagementProvider>(context);
@@ -333,86 +250,51 @@ class ManageAppScreen extends StatelessWidget {
         final isHovered = candidateData.isNotEmpty || provider.isDraggingOverAvailableZone;
 
         return AnimatedContainer(
-          duration: const Duration(milliseconds: 250),
+          duration: const Duration(milliseconds: 200),
           curve: Curves.easeOutCubic,
-          padding: const EdgeInsets.all(20),
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
           decoration: BoxDecoration(
-            color: Colors.transparent, // INVISIBLE BACKGROUND
-            borderRadius: BorderRadius.circular(28),
-            border: Border.all(
-              color: isHovered ? primaryColor : borderColor,
-              width: isHovered ? 1.8 : 1.0,
-            ),
+            color: isHovered
+                ? (isDark ? const Color(0xFF141414) : const Color(0xFFEBEBEB))
+                : (isDark ? const Color(0xFF0A0A0A) : const Color(0xFFF3F4F6)),
+            borderRadius: BorderRadius.circular(24),
+            // NO OUTLINES
           ),
           child: Column(
+            mainAxisSize: MainAxisSize.min, // Hug content
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Row(
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.all(7),
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          border: Border.all(color: primaryColor, width: 1.0),
-                        ),
-                        child: Icon(
-                          Icons.grid_view_rounded,
-                          size: 15,
-                          color: primaryColor,
-                        ),
-                      ),
-                      const SizedBox(width: 10),
-                      Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            loc.get('availableZoneTitle'),
-                            style: theme.textTheme.labelLarge?.copyWith(
-                              fontSize: 12,
-                              fontWeight: FontWeight.w800,
-                              letterSpacing: 1.0,
-                            ),
-                          ),
-                          Text(
-                            loc.get('availableZoneSubtitle'),
-                            style: theme.textTheme.bodyMedium?.copyWith(
-                              fontSize: 11,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ],
-                  ),
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                    decoration: BoxDecoration(
-                      color: Colors.transparent,
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: borderColor, width: 1.0),
+                  Text(
+                    loc.get('availableZoneTitle'),
+                    style: theme.textTheme.labelLarge?.copyWith(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w800,
+                      letterSpacing: 1.0,
                     ),
-                    child: Text(
-                      '${provider.availableApps.length}',
-                      style: theme.textTheme.labelLarge?.copyWith(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w800,
-                      ),
+                  ),
+                  Text(
+                    '${provider.availableApps.length}',
+                    style: TextStyle(
+                      fontSize: 11,
+                      color: primaryColor,
+                      fontWeight: FontWeight.w800,
                     ),
                   ),
                 ],
               ),
-              const SizedBox(height: 18),
+              const SizedBox(height: 12),
 
               if (provider.availableApps.isEmpty)
                 Container(
                   width: double.infinity,
-                  padding: const EdgeInsets.symmetric(vertical: 30),
+                  padding: const EdgeInsets.symmetric(vertical: 16),
                   alignment: Alignment.center,
                   child: Text(
-                    'Semua aplikasi telah masuk zona batas.',
-                    style: theme.textTheme.bodyMedium?.copyWith(fontSize: 12),
+                    'Semua aplikasi telah dibatasi.',
+                    style: theme.textTheme.bodyMedium?.copyWith(fontSize: 11),
                   ),
                 )
               else
@@ -423,10 +305,10 @@ class ManageAppScreen extends StatelessWidget {
                       physics: const NeverScrollableScrollPhysics(),
                       itemCount: provider.availableApps.length,
                       gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
-                        maxCrossAxisExtent: 120,
-                        mainAxisSpacing: 12,
-                        crossAxisSpacing: 12,
-                        childAspectRatio: 0.90,
+                        maxCrossAxisExtent: 110,
+                        mainAxisSpacing: 10,
+                        crossAxisSpacing: 10,
+                        childAspectRatio: 0.95,
                       ),
                       itemBuilder: (context, index) {
                         final app = provider.availableApps[index];
@@ -436,7 +318,6 @@ class ManageAppScreen extends StatelessWidget {
                           isRestricted: false,
                           isDark: isDark,
                           primaryColor: primaryColor,
-                          borderColor: borderColor,
                           onTap: () {
                             SmoothAppSheet.show(
                               context: context,
@@ -464,7 +345,6 @@ class ManageAppScreen extends StatelessWidget {
     required bool isRestricted,
     required bool isDark,
     required Color primaryColor,
-    required Color borderColor,
     required VoidCallback onTap,
     required VoidCallback onTapEject,
   }) {
@@ -472,16 +352,12 @@ class ManageAppScreen extends StatelessWidget {
 
     final cardContent = GestureDetector(
       onTap: onTap,
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 150),
-        padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 8),
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 6),
         decoration: BoxDecoration(
-          color: Colors.transparent, // INVISIBLE BACKGROUND
-          borderRadius: BorderRadius.circular(20),
-          border: Border.all(
-            color: isRestricted ? primaryColor : borderColor,
-            width: 1.0,
-          ),
+          color: isDark ? const Color(0xFF121212) : const Color(0xFFFFFFFF),
+          borderRadius: BorderRadius.circular(18),
+          // NO OUTLINES
         ),
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
@@ -489,30 +365,22 @@ class ManageAppScreen extends StatelessWidget {
             Stack(
               clipBehavior: Clip.none,
               children: [
-                Container(
-                  width: 42,
-                  height: 42,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    border: Border.all(
-                      color: isDark ? const Color(0xFF333333) : const Color(0xFFCCCCCC),
-                      width: 1.0,
-                    ),
-                  ),
-                  child: Icon(
-                    app.icon,
-                    color: primaryColor,
-                    size: 20,
+                // Authentic Brand Logo
+                SizedBox(
+                  width: 32,
+                  height: 32,
+                  child: Center(
+                    child: app.buildLogo(size: 28),
                   ),
                 ),
                 if (isRestricted)
                   Positioned(
                     top: -4,
-                    right: -4,
+                    right: -6,
                     child: GestureDetector(
                       onTap: onTapEject,
                       child: Container(
-                        padding: const EdgeInsets.all(3),
+                        padding: const EdgeInsets.all(2),
                         decoration: BoxDecoration(
                           color: primaryColor,
                           shape: BoxShape.circle,
@@ -520,7 +388,7 @@ class ManageAppScreen extends StatelessWidget {
                         child: Icon(
                           Icons.close_rounded,
                           color: isDark ? const Color(0xFF000000) : const Color(0xFFFFFFFF),
-                          size: 10,
+                          size: 9,
                         ),
                       ),
                     ),
@@ -542,7 +410,7 @@ class ManageAppScreen extends StatelessWidget {
             Text(
               app.formattedUsage,
               style: theme.textTheme.bodyMedium?.copyWith(
-                fontSize: 10,
+                fontSize: 9,
                 fontWeight: FontWeight.w500,
               ),
             ),
@@ -551,25 +419,24 @@ class ManageAppScreen extends StatelessWidget {
       ),
     );
 
-    // Draggable wrapper with mouse & touch responsiveness and smooth feedback
+    // Draggable wrapper with mouse & touch responsiveness
     return Draggable<String>(
       data: app.id,
       feedback: Material(
         color: Colors.transparent,
         child: Transform.scale(
-          scale: 1.06,
+          scale: 1.08,
           child: Container(
-            width: 100,
-            height: 95,
-            padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 8),
+            width: 90,
+            height: 80,
+            padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 6),
             decoration: BoxDecoration(
-              color: isDark ? const Color(0xFF000000) : const Color(0xFFF8F9FA),
-              borderRadius: BorderRadius.circular(22),
-              border: Border.all(color: primaryColor, width: 1.5),
+              color: isDark ? const Color(0xFF1F1F1F) : const Color(0xFFFFFFFF),
+              borderRadius: BorderRadius.circular(18),
               boxShadow: [
                 BoxShadow(
                   color: Colors.black.withOpacity(isDark ? 0.6 : 0.15),
-                  blurRadius: 20,
+                  blurRadius: 18,
                   offset: const Offset(0, 6),
                 ),
               ],
@@ -577,13 +444,13 @@ class ManageAppScreen extends StatelessWidget {
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                Icon(app.icon, color: primaryColor, size: 24),
-                const SizedBox(height: 6),
+                app.buildLogo(size: 30),
+                const SizedBox(height: 4),
                 Text(
                   app.name,
                   maxLines: 1,
                   style: theme.textTheme.labelLarge?.copyWith(
-                    fontSize: 11,
+                    fontSize: 10,
                     fontWeight: FontWeight.w800,
                   ),
                 ),
@@ -593,7 +460,7 @@ class ManageAppScreen extends StatelessWidget {
         ),
       ),
       childWhenDragging: Opacity(
-        opacity: 0.2,
+        opacity: 0.15,
         child: cardContent,
       ),
       child: cardContent,

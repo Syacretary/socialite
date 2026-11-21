@@ -9,16 +9,10 @@ class AppTheme {
   static const Color pureWhite = Color(0xFFFFFFFF);
   static const Color pureBlack = Color(0xFF000000);
 
-  // Border & Muted Accents
-  static const Color darkBorder = Color(0xFF262626);
-  static const Color darkBorderHighlight = Color(0xFFFFFFFF);
   static const Color darkMuted = Color(0xFF888888);
-
-  static const Color lightBorder = Color(0xFFE5E5E5);
-  static const Color lightBorderHighlight = Color(0xFF000000);
   static const Color lightMuted = Color(0xFF737373);
 
-  // Dark Theme (True AMOLED Black + Pure White Accent, Invisible Widget Backgrounds)
+  // Dark Theme (True AMOLED Black + Pure White Accent, NO OUTLINES)
   static ThemeData get darkTheme {
     final textTheme = GoogleFonts.plusJakartaSansTextTheme(ThemeData.dark().textTheme);
     final headingFont = GoogleFonts.spaceGrotesk;
@@ -27,17 +21,17 @@ class AppTheme {
       useMaterial3: true,
       brightness: Brightness.dark,
       scaffoldBackgroundColor: amoledBlack,
-      cardColor: Colors.transparent, // Invisible background
+      cardColor: Colors.transparent,
       colorScheme: const ColorScheme.dark(
         surface: amoledBlack,
         onSurface: pureWhite,
-        primary: pureWhite, // ACCENT IS PURE WHITE
+        primary: pureWhite,
         onPrimary: amoledBlack,
         secondary: pureWhite,
         error: pureWhite,
-        outline: darkBorder,
+        outline: Colors.transparent, // NO OUTLINES
       ),
-      dividerColor: darkBorder,
+      dividerColor: Colors.transparent,
       textTheme: textTheme.copyWith(
         displayLarge: headingFont(
           fontSize: 38,
@@ -80,11 +74,11 @@ class AppTheme {
         ),
       ),
       cardTheme: CardThemeData(
-        color: Colors.transparent, // Invisible container
+        color: Colors.transparent,
         elevation: 0,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(24),
-          side: const BorderSide(color: darkBorder, width: 1.0),
+          side: BorderSide.none, // NO OUTLINES
         ),
       ),
       appBarTheme: AppBarTheme(
@@ -103,7 +97,7 @@ class AppTheme {
     );
   }
 
-  // Light Theme (Putih Susu + Pure Black Accent, Invisible Widget Backgrounds)
+  // Light Theme (Putih Susu + Pure Black Accent, NO OUTLINES)
   static ThemeData get lightTheme {
     final textTheme = GoogleFonts.plusJakartaSansTextTheme(ThemeData.light().textTheme);
     final headingFont = GoogleFonts.spaceGrotesk;
@@ -112,17 +106,17 @@ class AppTheme {
       useMaterial3: true,
       brightness: Brightness.light,
       scaffoldBackgroundColor: milkWhite,
-      cardColor: Colors.transparent, // Invisible background
+      cardColor: Colors.transparent,
       colorScheme: const ColorScheme.light(
         surface: milkWhite,
         onSurface: pureBlack,
-        primary: pureBlack, // ACCENT IS PURE BLACK
+        primary: pureBlack,
         onPrimary: pureWhite,
         secondary: pureBlack,
         error: pureBlack,
-        outline: lightBorder,
+        outline: Colors.transparent, // NO OUTLINES
       ),
-      dividerColor: lightBorder,
+      dividerColor: Colors.transparent,
       textTheme: textTheme.copyWith(
         displayLarge: headingFont(
           fontSize: 38,
@@ -165,11 +159,11 @@ class AppTheme {
         ),
       ),
       cardTheme: CardThemeData(
-        color: Colors.transparent, // Invisible container
+        color: Colors.transparent,
         elevation: 0,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(24),
-          side: const BorderSide(color: lightBorder, width: 1.0),
+          side: BorderSide.none, // NO OUTLINES
         ),
       ),
       appBarTheme: AppBarTheme(

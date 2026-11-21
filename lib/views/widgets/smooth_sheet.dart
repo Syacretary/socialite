@@ -93,8 +93,7 @@ class _AppSheetContentState extends State<_AppSheetContent> with SingleTickerPro
     final app = widget.app;
 
     final primaryColor = isDark ? const Color(0xFFFFFFFF) : const Color(0xFF000000);
-    final borderColor = isDark ? const Color(0xFF262626) : const Color(0xFFE5E5E5);
-    final surfaceColor = isDark ? const Color(0xFF000000) : const Color(0xFFF8F9FA);
+    final surfaceColor = isDark ? const Color(0xFF111111) : const Color(0xFFFFFFFF);
 
     return SafeArea(
       child: Center(
@@ -111,7 +110,7 @@ class _AppSheetContentState extends State<_AppSheetContent> with SingleTickerPro
                   decoration: BoxDecoration(
                     color: surfaceColor.withOpacity(0.96),
                     borderRadius: BorderRadius.circular(32),
-                    border: Border.all(color: borderColor, width: 1.0),
+                    // NO OUTLINES
                   ),
                   child: ScaleTransition(
                     scale: _scaleAnimation,
@@ -127,50 +126,45 @@ class _AppSheetContentState extends State<_AppSheetContent> with SingleTickerPro
                             borderRadius: BorderRadius.circular(4),
                           ),
                         ),
-                        const SizedBox(height: 24),
+                        const SizedBox(height: 20),
 
-                        // App Icon & Identification
-                        Container(
-                          width: 64,
-                          height: 64,
-                          decoration: BoxDecoration(
-                            shape: BoxShape.circle,
-                            border: Border.all(color: borderColor, width: 1.2),
-                          ),
-                          child: Icon(
-                            app.icon,
-                            color: primaryColor,
-                            size: 28,
+                        // Authentic App Logo
+                        SizedBox(
+                          width: 48,
+                          height: 48,
+                          child: Center(
+                            child: app.buildLogo(size: 40),
                           ),
                         ),
-                        const SizedBox(height: 14),
+                        const SizedBox(height: 12),
 
                         Text(
                           app.name,
                           style: theme.textTheme.displayMedium?.copyWith(
-                            fontSize: 22,
+                            fontSize: 20,
                             fontWeight: FontWeight.w800,
                             letterSpacing: -0.5,
                           ),
                         ),
-                        const SizedBox(height: 4),
+                        const SizedBox(height: 2),
                         Text(
                           app.category.toUpperCase(),
                           style: theme.textTheme.bodyMedium?.copyWith(
-                            fontSize: 11,
+                            fontSize: 10,
                             letterSpacing: 1.5,
                             fontWeight: FontWeight.w600,
                           ),
                         ),
 
-                        const SizedBox(height: 24),
+                        const SizedBox(height: 20),
 
-                        // Quick Usage & Restriction Status Bar
+                        // Quick Usage & Restriction Status Bar (No Outlines)
                         Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+                          padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
                           decoration: BoxDecoration(
+                            color: isDark ? const Color(0xFF1A1A1A) : const Color(0xFFF3F4F6),
                             borderRadius: BorderRadius.circular(20),
-                            border: Border.all(color: borderColor, width: 1.0),
+                            // NO OUTLINES
                           ),
                           child: Row(
                             mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -181,7 +175,7 @@ class _AppSheetContentState extends State<_AppSheetContent> with SingleTickerPro
                                   Text(
                                     'PENGGUNAAN HARI INI',
                                     style: theme.textTheme.bodyMedium?.copyWith(
-                                      fontSize: 10,
+                                      fontSize: 9,
                                       letterSpacing: 1.2,
                                       fontWeight: FontWeight.w700,
                                     ),
@@ -190,23 +184,22 @@ class _AppSheetContentState extends State<_AppSheetContent> with SingleTickerPro
                                   Text(
                                     app.formattedUsage,
                                     style: theme.textTheme.titleLarge?.copyWith(
-                                      fontSize: 18,
+                                      fontSize: 16,
                                       fontWeight: FontWeight.w800,
                                     ),
                                   ),
                                 ],
                               ),
                               Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
                                 decoration: BoxDecoration(
-                                  color: app.isRestricted ? primaryColor : Colors.transparent,
-                                  borderRadius: BorderRadius.circular(14),
-                                  border: Border.all(color: primaryColor, width: 1.0),
+                                  color: app.isRestricted ? primaryColor : (isDark ? const Color(0xFF262626) : const Color(0xFFE5E7EB)),
+                                  borderRadius: BorderRadius.circular(12),
                                 ),
                                 child: Text(
                                   app.isRestricted ? 'DIBATASI' : 'BEBAS',
                                   style: TextStyle(
-                                    fontSize: 11,
+                                    fontSize: 10,
                                     fontWeight: FontWeight.w800,
                                     letterSpacing: 0.8,
                                     color: app.isRestricted
@@ -219,9 +212,9 @@ class _AppSheetContentState extends State<_AppSheetContent> with SingleTickerPro
                           ),
                         ),
 
-                        const SizedBox(height: 24),
+                        const SizedBox(height: 20),
 
-                        // Action Button (Lightweight, Spring Feedback)
+                        // Action Button (No Outlines)
                         SizedBox(
                           width: double.infinity,
                           child: TextButton(
@@ -231,15 +224,14 @@ class _AppSheetContentState extends State<_AppSheetContent> with SingleTickerPro
                             },
                             style: TextButton.styleFrom(
                               backgroundColor: app.isRestricted
-                                  ? Colors.transparent
+                                  ? (isDark ? const Color(0xFF222222) : const Color(0xFFE5E7EB))
                                   : primaryColor,
                               foregroundColor: app.isRestricted
                                   ? primaryColor
                                   : (isDark ? const Color(0xFF000000) : const Color(0xFFFFFFFF)),
-                              padding: const EdgeInsets.symmetric(vertical: 16),
+                              padding: const EdgeInsets.symmetric(vertical: 14),
                               shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(20),
-                                side: BorderSide(color: primaryColor, width: 1.2),
+                                borderRadius: BorderRadius.circular(18),
                               ),
                             ),
                             child: Text(
@@ -270,8 +262,6 @@ class SpringCurve extends Curve {
 
   @override
   double transformInternal(double t) {
-    // Gentle spring curve with light bounce
-    final c4 = (2 * 3.1415926535) / 3.0;
     if (t == 0) return 0;
     if (t == 1) return 1;
     return (t * t * ((1.70158 + 1) * t - 1.70158)) + 1;

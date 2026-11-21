@@ -5,6 +5,7 @@ class AppItem {
   final String name;
   final String packageName;
   final IconData icon;
+  final String? iconAsset;
   final Color brandColor;
   final String category;
   final int usageMinutesToday;
@@ -15,6 +16,7 @@ class AppItem {
     required this.name,
     required this.packageName,
     required this.icon,
+    this.iconAsset,
     required this.brandColor,
     required this.category,
     required this.usageMinutesToday,
@@ -30,11 +32,25 @@ class AppItem {
     return '${mins}m';
   }
 
+  Widget buildLogo({double size = 26, Color? tintColor}) {
+    if (iconAsset != null && iconAsset!.isNotEmpty) {
+      return Image.asset(
+        iconAsset!,
+        width: size,
+        height: size,
+        fit: BoxFit.contain,
+        errorBuilder: (_, __, ___) => Icon(icon, size: size, color: tintColor),
+      );
+    }
+    return Icon(icon, size: size, color: tintColor);
+  }
+
   AppItem copyWith({
     String? id,
     String? name,
     String? packageName,
     IconData? icon,
+    String? iconAsset,
     Color? brandColor,
     String? category,
     int? usageMinutesToday,
@@ -45,6 +61,7 @@ class AppItem {
       name: name ?? this.name,
       packageName: packageName ?? this.packageName,
       icon: icon ?? this.icon,
+      iconAsset: iconAsset ?? this.iconAsset,
       brandColor: brandColor ?? this.brandColor,
       category: category ?? this.category,
       usageMinutesToday: usageMinutesToday ?? this.usageMinutesToday,
