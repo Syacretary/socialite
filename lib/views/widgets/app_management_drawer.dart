@@ -4,14 +4,13 @@ import 'package:provider/provider.dart';
 import '../../models/app_item.dart';
 import '../../providers/app_management_provider.dart';
 
-class AppManagementDrawer extends StatelessWidget {
+class AppManagementDrawer extends StatefulWidget {
   final String appId;
 
   const AppManagementDrawer({super.key, required this.appId});
 
   static Future<void> show(BuildContext context, String appId) {
     HapticFeedback.lightImpact();
-
     return showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -21,6 +20,14 @@ class AppManagementDrawer extends StatelessWidget {
       builder: (_) => AppManagementDrawer(appId: appId),
     );
   }
+
+  @override
+  State<AppManagementDrawer> createState() => _AppManagementDrawerState();
+}
+
+class _AppManagementDrawerState extends State<AppManagementDrawer> {
+  // 0 = Time Limit, 1 = Features Limit
+  int _activeTab = 0;
 
   @override
   Widget build(BuildContext context) {
@@ -33,10 +40,11 @@ class AppManagementDrawer extends StatelessWidget {
 
     return Consumer<AppManagementProvider>(
       builder: (context, provider, _) {
-        final app = provider.getAppById(appId);
+        final app = provider.getAppById(widget.appId);
         if (app == null) return const SizedBox.shrink();
 
-        // Langsung menutupi 3/4 layar atau lebih (~80%) dari dasar layar ke atas (Bukan floating window)
+        final showTabs = app.hasFeatureBlocks;
+
         return Align(
           alignment: Alignment.bottomCenter,
           child: ConstrainedBox(
@@ -52,13 +60,11 @@ class AppManagementDrawer extends StatelessWidget {
                 top: false,
                 child: Column(
                   children: [
-                    // Grabber indicator & Header (swipe down to dismiss)
+                    // ── Grabber
                     GestureDetector(
                       behavior: HitTestBehavior.opaque,
-                      onVerticalDragEnd: (details) {
-                        if ((details.primaryVelocity ?? 0) > 180) {
-                          Navigator.of(context).pop();
-                        }
+                      onVerticalDragEnd: (d) {
+                        if ((d.primaryVelocity ?? 0) > 180) Navigator.of(context).pop();
                       },
                       child: Column(
                         mainAxisSize: MainAxisSize.min,
@@ -74,68 +80,56 @@ class AppManagementDrawer extends StatelessWidget {
                           ),
                           Padding(
                             padding: const EdgeInsets.fromLTRB(18, 4, 18, 8),
-                            child: _buildAppHeader(context, app, provider, isDark, primaryColor),
+                            child: _buildAppHeader(context, app, isDark, primaryColor),
                           ),
                         ],
                       ),
                     ),
 
-                    // Scrollable configuration content with bottom feather overlay
+                    // ── Tab Switcher (only if app has feature blocks)
+                    if (showTabs) ...[
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(16, 0, 16, 10),
+                        child: _buildTabSwitcher(isDark, primaryColor, surfaceColor, cardColor),
+                      ),
+                    ],
+
+                    // ── Content with bottom feather
                     Expanded(
                       child: Stack(
                         children: [
                           SingleChildScrollView(
                             physics: const BouncingScrollPhysics(),
                             padding: const EdgeInsets.fromLTRB(16, 2, 16, 48),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.stretch,
-                              children: [
-                                // SECTION 1: BATAS DURASI HARIAN (Recommended & Custom)
-                                _buildDurationSection(context, app, provider, isDark, primaryColor, cardColor),
-
-                                const SizedBox(height: 12),
-
-                                // SECTION 2: AKSI KETIKA BATAS TERCAPAI
-                                _buildActionSection(context, app, provider, isDark, primaryColor, cardColor),
-
-                                const SizedBox(height: 12),
-
-                                // SECTION 3: BLOKIR FITUR SPESIFIK APLIKASI
-                                _buildFeatureBlockSection(context, app, provider, isDark, primaryColor, cardColor),
-
-                                const SizedBox(height: 16),
-
-                                // AUTO-SAVED NOTIFICATION
-                                Center(
-                                  child: Row(
-                                    mainAxisSize: MainAxisSize.min,
-                                    children: [
-                                      Icon(
-                                        Icons.check_circle_outline_rounded,
-                                        size: 13,
-                                        color: isDark ? const Color(0xFF777777) : const Color(0xFF888888),
-                                      ),
-                                      const SizedBox(width: 6),
-                                      Text(
-                                        'Setelan otomatis tersimpan',
-                                        style: theme.textTheme.bodyMedium?.copyWith(
-                                          fontSize: 11,
-                                          fontWeight: FontWeight.w500,
-                                          color: isDark ? const Color(0xFF777777) : const Color(0xFF888888),
-                                        ),
-                                      ),
-                                    ],
-                                  ),
+                            child: AnimatedSwitcher(
+                              duration: const Duration(milliseconds: 220),
+                              switchInCurve: Curves.easeOutCubic,
+                              switchOutCurve: Curves.easeInCubic,
+                              transitionBuilder: (child, anim) => FadeTransition(
+                                opacity: anim,
+                                child: SlideTransition(
+                                  position: Tween<Offset>(
+                                    begin: const Offset(0, 0.03),
+                                    end: Offset.zero,
+                                  ).animate(anim),
+                                  child: child,
                                 ),
-                              ],
+                              ),
+                              child: showTabs && _activeTab == 1
+                                  ? KeyedSubtree(
+                                      key: const ValueKey('features'),
+                                      child: _buildFeaturesTab(context, app, provider, isDark, primaryColor, cardColor),
+                                    )
+                                  : KeyedSubtree(
+                                      key: const ValueKey('timelimit'),
+                                      child: _buildTimeLimitTab(context, app, provider, isDark, primaryColor, cardColor),
+                                    ),
                             ),
                           ),
 
-                          // Bottom feather fade overlay — mirrors header feather
+                          // Bottom feather overlay
                           Positioned(
-                            bottom: 0,
-                            left: 0,
-                            right: 0,
+                            bottom: 0, left: 0, right: 0,
                             height: 40,
                             child: IgnorePointer(
                               child: Container(
@@ -165,25 +159,78 @@ class AppManagementDrawer extends StatelessWidget {
     );
   }
 
-  Widget _buildAppHeader(
-    BuildContext context,
-    AppItem app,
-    AppManagementProvider provider,
-    bool isDark,
-    Color primaryColor,
-  ) {
-    final theme = Theme.of(context);
+  // ── Tab Switcher pill
+  Widget _buildTabSwitcher(bool isDark, Color primaryColor, Color surfaceColor, Color cardColor) {
+    final tabs = ['Time Limit', 'Features Limit'];
+    return Container(
+      padding: const EdgeInsets.all(3),
+      decoration: BoxDecoration(
+        color: cardColor,
+        borderRadius: BorderRadius.circular(14),
+      ),
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final tabW = (constraints.maxWidth - 6) / 2;
+          return Stack(
+            children: [
+              // Sliding pill indicator
+              AnimatedPositioned(
+                duration: const Duration(milliseconds: 220),
+                curve: Curves.easeOutCubic,
+                left: _activeTab == 0 ? 0 : tabW,
+                top: 0,
+                bottom: 0,
+                width: tabW,
+                child: Container(
+                  decoration: BoxDecoration(
+                    color: primaryColor,
+                    borderRadius: BorderRadius.circular(11),
+                  ),
+                ),
+              ),
+              Row(
+                children: tabs.asMap().entries.map((e) {
+                  final isSelected = _activeTab == e.key;
+                  return Expanded(
+                    child: GestureDetector(
+                      onTap: () {
+                        HapticFeedback.selectionClick();
+                        setState(() => _activeTab = e.key);
+                      },
+                      behavior: HitTestBehavior.opaque,
+                      child: SizedBox(
+                        height: 36,
+                        child: Center(
+                          child: Text(
+                            e.value,
+                            style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w800,
+                              letterSpacing: -0.2,
+                              color: isSelected
+                                  ? (isDark ? const Color(0xFF000000) : const Color(0xFFFFFFFF))
+                                  : (isDark ? const Color(0xFF777777) : const Color(0xFF888888)),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  );
+                }).toList(),
+              ),
+            ],
+          );
+        },
+      ),
+    );
+  }
 
+  // ── App header row
+  Widget _buildAppHeader(BuildContext context, AppItem app, bool isDark, Color primaryColor) {
+    final theme = Theme.of(context);
     return Row(
       children: [
-        // Enlarged unboxed authentic app logo
-        SizedBox(
-          width: 38,
-          height: 38,
-          child: Center(
-            child: app.buildLogo(size: 36, isDark: isDark),
-          ),
-        ),
+        SizedBox(width: 38, height: 38, child: Center(child: app.buildLogo(size: 36, isDark: isDark))),
         const SizedBox(width: 12),
         Expanded(
           child: Column(
@@ -192,13 +239,10 @@ class AppManagementDrawer extends StatelessWidget {
               Text(
                 app.name,
                 style: theme.textTheme.titleLarge?.copyWith(
-                  fontSize: 17,
-                  fontWeight: FontWeight.w800,
-                  letterSpacing: -0.3,
+                  fontSize: 17, fontWeight: FontWeight.w800, letterSpacing: -0.3,
                 ),
               ),
               const SizedBox(height: 2),
-              // DYNAMIC STATUS BADGE (Active if in Restricted Zone, Dormant if in Available)
               Row(
                 children: [
                   Container(
@@ -212,9 +256,7 @@ class AppManagementDrawer extends StatelessWidget {
                     child: Text(
                       app.isRestricted ? 'AKTIF' : 'NONAKTIF',
                       style: TextStyle(
-                        fontSize: 9,
-                        fontWeight: FontWeight.w900,
-                        letterSpacing: 0.6,
+                        fontSize: 9, fontWeight: FontWeight.w900, letterSpacing: 0.6,
                         color: app.isRestricted
                             ? (isDark ? const Color(0xFF000000) : const Color(0xFFFFFFFF))
                             : (isDark ? const Color(0xFF888888) : const Color(0xFF666666)),
@@ -224,10 +266,7 @@ class AppManagementDrawer extends StatelessWidget {
                   const SizedBox(width: 8),
                   Text(
                     '${app.formattedUsage} terpakai',
-                    style: theme.textTheme.bodyMedium?.copyWith(
-                      fontSize: 11,
-                      fontWeight: FontWeight.w600,
-                    ),
+                    style: theme.textTheme.bodyMedium?.copyWith(fontSize: 11, fontWeight: FontWeight.w600),
                   ),
                 ],
               ),
@@ -244,26 +283,186 @@ class AppManagementDrawer extends StatelessWidget {
     );
   }
 
-  // --- SECTION 1: BATAS DURASI (Recommended & Custom Slider) ---
+  // ══════════════════════════════════════════
+  // TAB 1: TIME LIMIT
+  // ══════════════════════════════════════════
+  Widget _buildTimeLimitTab(
+    BuildContext context, AppItem app, AppManagementProvider provider,
+    bool isDark, Color primaryColor, Color cardColor,
+  ) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        _buildDurationSection(context, app, provider, isDark, primaryColor, cardColor),
+        const SizedBox(height: 12),
+        _buildActionSection(context, app, provider, isDark, primaryColor, cardColor),
+        const SizedBox(height: 20),
+        _buildAutoSavedNote(isDark),
+      ],
+    );
+  }
 
-  Widget _buildDurationSection(
-    BuildContext context,
-    AppItem app,
-    AppManagementProvider provider,
-    bool isDark,
-    Color primaryColor,
-    Color cardColor,
+  // ══════════════════════════════════════════
+  // TAB 2: FEATURES LIMIT
+  // ══════════════════════════════════════════
+  Widget _buildFeaturesTab(
+    BuildContext context, AppItem app, AppManagementProvider provider,
+    bool isDark, Color primaryColor, Color cardColor,
   ) {
     final theme = Theme.of(context);
-    final recommendedDurations = [5, 15, 30, 60, 120];
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Container(
+          padding: const EdgeInsets.all(14),
+          decoration: BoxDecoration(color: cardColor, borderRadius: BorderRadius.circular(20)),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    'BLOKIR FITUR SPESIFIK',
+                    style: theme.textTheme.labelLarge?.copyWith(
+                      fontSize: 10, letterSpacing: 1.2, fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                  Text(
+                    '${app.featureBlocks.where((f) => f.isBlocked).length} aktif',
+                    style: TextStyle(fontSize: 10, fontWeight: FontWeight.w800, color: primaryColor),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 4),
+              Text(
+                'Pembatasan langsung di dalam ${app.name} — tidak memerlukan batas waktu aktif.',
+                style: theme.textTheme.bodyMedium?.copyWith(
+                  fontSize: 10,
+                  color: isDark ? const Color(0xFF777777) : const Color(0xFF888888),
+                ),
+              ),
+              const SizedBox(height: 14),
+              ...app.featureBlocks.map((feat) => _buildFeatureRow(
+                context, feat, app, provider, isDark, primaryColor, cardColor,
+              )),
+            ],
+          ),
+        ),
+        const SizedBox(height: 20),
+        _buildAutoSavedNote(isDark),
+      ],
+    );
+  }
+
+  Widget _buildFeatureRow(
+    BuildContext context, AppFeatureBlock feat, AppItem app,
+    AppManagementProvider provider, bool isDark, Color primaryColor, Color cardColor,
+  ) {
+    final theme = Theme.of(context);
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 5),
+      child: InkWell(
+        onTap: () {
+          HapticFeedback.lightImpact();
+          provider.toggleFeatureBlock(app.id, feat.id);
+        },
+        borderRadius: BorderRadius.circular(12),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 2),
+          child: Row(
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      feat.title,
+                      style: theme.textTheme.labelLarge?.copyWith(
+                        fontSize: 12, fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    Text(
+                      feat.description,
+                      style: theme.textTheme.bodyMedium?.copyWith(
+                        fontSize: 10,
+                        color: isDark ? const Color(0xFF777777) : const Color(0xFF888888),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 12),
+              // Animated toggle switch
+              AnimatedContainer(
+                duration: const Duration(milliseconds: 200),
+                width: 40,
+                height: 24,
+                padding: const EdgeInsets.all(3),
+                decoration: BoxDecoration(
+                  color: feat.isBlocked
+                      ? primaryColor
+                      : (isDark ? const Color(0xFF262626) : const Color(0xFFD4D4D4)),
+                  borderRadius: BorderRadius.circular(14),
+                ),
+                child: AnimatedAlign(
+                  duration: const Duration(milliseconds: 200),
+                  curve: Curves.easeOutCubic,
+                  alignment: feat.isBlocked ? Alignment.centerRight : Alignment.centerLeft,
+                  child: Container(
+                    width: 18,
+                    height: 18,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: feat.isBlocked
+                          ? (isDark ? const Color(0xFF000000) : const Color(0xFFFFFFFF))
+                          : (isDark ? const Color(0xFF777777) : const Color(0xFFFFFFFF)),
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  // ── Auto-saved note
+  Widget _buildAutoSavedNote(bool isDark) {
+    return Center(
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(Icons.check_circle_outline_rounded, size: 13,
+              color: isDark ? const Color(0xFF777777) : const Color(0xFF888888)),
+          const SizedBox(width: 6),
+          Text(
+            'Setelan otomatis tersimpan',
+            style: TextStyle(
+              fontSize: 11, fontWeight: FontWeight.w500,
+              color: isDark ? const Color(0xFF777777) : const Color(0xFF888888),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ══════════════════════════════════════════
+  // DURATION SECTION
+  // ══════════════════════════════════════════
+  Widget _buildDurationSection(
+    BuildContext context, AppItem app, AppManagementProvider provider,
+    bool isDark, Color primaryColor, Color cardColor,
+  ) {
+    final theme = Theme.of(context);
+    const recommendedDurations = [5, 15, 30, 60, 120];
 
     return Container(
       padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: cardColor,
-        borderRadius: BorderRadius.circular(20),
-        // NO OUTLINES
-      ),
+      decoration: BoxDecoration(color: cardColor, borderRadius: BorderRadius.circular(20)),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -273,36 +472,22 @@ class AppManagementDrawer extends StatelessWidget {
               Text(
                 'BATAS DURASI HARIAN',
                 style: theme.textTheme.labelLarge?.copyWith(
-                  fontSize: 10,
-                  letterSpacing: 1.2,
-                  fontWeight: FontWeight.w800,
+                  fontSize: 10, letterSpacing: 1.2, fontWeight: FontWeight.w800,
                 ),
               ),
               Text(
                 app.formattedLimit,
-                style: TextStyle(
-                  fontSize: 13,
-                  fontWeight: FontWeight.w900,
-                  color: primaryColor,
-                ),
+                style: TextStyle(fontSize: 13, fontWeight: FontWeight.w900, color: primaryColor),
               ),
             ],
           ),
           const SizedBox(height: 10),
 
-          // Recommended Pills: 5m, 15m, 30m, 1j, 2j
+          // Recommended pills
           Row(
             children: recommendedDurations.map((minutes) {
               final isSelected = app.dailyLimitMinutes == minutes;
-              String label;
-              if (minutes == 60) {
-                label = '1 Jam';
-              } else if (minutes == 120) {
-                label = '2 Jam';
-              } else {
-                label = '$minutes m';
-              }
-
+              final label = minutes == 60 ? '1 Jam' : minutes == 120 ? '2 Jam' : '$minutes m';
               return Expanded(
                 child: Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 2),
@@ -341,23 +526,18 @@ class AppManagementDrawer extends StatelessWidget {
 
           const SizedBox(height: 14),
 
-          // Custom Duration Slider: 1 min to 150 min (2.5 hours)
+          // Custom slider
           Row(
             children: [
               Text(
-                'Atur Sendiri (1m - 2,5j)',
-                style: theme.textTheme.bodyMedium?.copyWith(
-                  fontSize: 11,
-                  fontWeight: FontWeight.w600,
-                ),
+                'Atur Sendiri (1m – 2,5j)',
+                style: theme.textTheme.bodyMedium?.copyWith(fontSize: 11, fontWeight: FontWeight.w600),
               ),
               const Spacer(),
               Text(
                 '${app.dailyLimitMinutes} menit',
                 style: theme.textTheme.bodyMedium?.copyWith(
-                  fontSize: 11,
-                  fontWeight: FontWeight.w700,
-                  color: primaryColor,
+                  fontSize: 11, fontWeight: FontWeight.w700, color: primaryColor,
                 ),
               ),
             ],
@@ -376,9 +556,7 @@ class AppManagementDrawer extends StatelessWidget {
               min: 1.0,
               max: 150.0,
               divisions: 149,
-              onChanged: (val) {
-                provider.updateDailyLimit(app.id, val.round());
-              },
+              onChanged: (val) => provider.updateDailyLimit(app.id, val.round()),
             ),
           ),
         ],
@@ -386,59 +564,30 @@ class AppManagementDrawer extends StatelessWidget {
     );
   }
 
-  // --- SECTION 2: AKSI KETIKA BATAS TERCAPAI (Horizontal Bento-like Grid) ---
-
+  // ══════════════════════════════════════════
+  // ACTION SECTION (Bento grid)
+  // ══════════════════════════════════════════
   Widget _buildActionSection(
-    BuildContext context,
-    AppItem app,
-    AppManagementProvider provider,
-    bool isDark,
-    Color primaryColor,
-    Color cardColor,
+    BuildContext context, AppItem app, AppManagementProvider provider,
+    bool isDark, Color primaryColor, Color cardColor,
   ) {
     final theme = Theme.of(context);
 
-    final actions = [
-      const _ActionOption(
-        action: LimitAction.notifyOnly,
-        title: 'Notifikasi',
-        description: 'Peringatan halus',
-        icon: Icons.notifications_none_rounded,
-      ),
-      const _ActionOption(
-        action: LimitAction.popupReminder,
-        title: 'Pop-up',
-        description: 'Jendela intervensi',
-        icon: Icons.filter_none_rounded,
-      ),
-      const _ActionOption(
-        action: LimitAction.blockAndClose,
-        title: 'Blokir',
-        description: 'Keluar & kunci',
-        icon: Icons.block_rounded,
-      ),
+    const actions = [
+      _ActionOption(action: LimitAction.notifyOnly, title: 'Notifikasi', description: 'Peringatan halus', icon: Icons.notifications_none_rounded),
+      _ActionOption(action: LimitAction.popupReminder, title: 'Pop-up', description: 'Jendela intervensi', icon: Icons.filter_none_rounded),
+      _ActionOption(action: LimitAction.blockAndClose, title: 'Blokir', description: 'Keluar & kunci', icon: Icons.block_rounded),
     ];
 
-    String activeActionLabel;
-    switch (app.actionOnLimit) {
-      case LimitAction.notifyOnly:
-        activeActionLabel = 'Notifikasi Saja';
-        break;
-      case LimitAction.popupReminder:
-        activeActionLabel = 'Pop-up Window';
-        break;
-      case LimitAction.blockAndClose:
-        activeActionLabel = 'Keluar & Blokir';
-        break;
-    }
+    final activeLabel = {
+      LimitAction.notifyOnly: 'Notifikasi Saja',
+      LimitAction.popupReminder: 'Pop-up Window',
+      LimitAction.blockAndClose: 'Keluar & Blokir',
+    }[app.actionOnLimit]!;
 
     return Container(
       padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: cardColor,
-        borderRadius: BorderRadius.circular(20),
-        // NO OUTLINES
-      ),
+      decoration: BoxDecoration(color: cardColor, borderRadius: BorderRadius.circular(20)),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -448,30 +597,23 @@ class AppManagementDrawer extends StatelessWidget {
               Text(
                 'AKSI KETIKA BATAS TERCAPAI',
                 style: theme.textTheme.labelLarge?.copyWith(
-                  fontSize: 10,
-                  letterSpacing: 1.2,
-                  fontWeight: FontWeight.w800,
+                  fontSize: 10, letterSpacing: 1.2, fontWeight: FontWeight.w800,
                 ),
               ),
               Text(
-                activeActionLabel,
-                style: TextStyle(
-                  fontSize: 10,
-                  fontWeight: FontWeight.w800,
-                  color: primaryColor,
-                ),
+                activeLabel,
+                style: TextStyle(fontSize: 10, fontWeight: FontWeight.w800, color: primaryColor),
               ),
             ],
           ),
           const SizedBox(height: 12),
 
-          // Horizontal Bento Grid
+          // Horizontal bento grid
           Row(
             children: actions.asMap().entries.map((entry) {
               final idx = entry.key;
               final opt = entry.value;
               final isSelected = app.actionOnLimit == opt.action;
-
               return Expanded(
                 child: Padding(
                   padding: EdgeInsets.only(
@@ -500,16 +642,14 @@ class AppManagementDrawer extends StatelessWidget {
                             mainAxisAlignment: MainAxisAlignment.spaceBetween,
                             children: [
                               Icon(
-                                opt.icon,
-                                size: 18,
+                                opt.icon, size: 18,
                                 color: isSelected
                                     ? (isDark ? const Color(0xFF000000) : const Color(0xFFFFFFFF))
                                     : primaryColor,
                               ),
                               AnimatedContainer(
                                 duration: const Duration(milliseconds: 180),
-                                width: 6,
-                                height: 6,
+                                width: 6, height: 6,
                                 decoration: BoxDecoration(
                                   shape: BoxShape.circle,
                                   color: isSelected
@@ -519,15 +659,13 @@ class AppManagementDrawer extends StatelessWidget {
                               ),
                             ],
                           ),
-                          const SizedBox(height: 12),
+                          const SizedBox(height: 10),
                           Text(
                             opt.title,
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                             style: TextStyle(
-                              fontSize: 11,
-                              fontWeight: FontWeight.w800,
-                              letterSpacing: -0.2,
+                              fontSize: 11, fontWeight: FontWeight.w800, letterSpacing: -0.2,
                               color: isSelected
                                   ? (isDark ? const Color(0xFF000000) : const Color(0xFFFFFFFF))
                                   : primaryColor,
@@ -539,9 +677,7 @@ class AppManagementDrawer extends StatelessWidget {
                             maxLines: 2,
                             overflow: TextOverflow.ellipsis,
                             style: TextStyle(
-                              fontSize: 9,
-                              fontWeight: FontWeight.w500,
-                              height: 1.2,
+                              fontSize: 9, fontWeight: FontWeight.w500, height: 1.2,
                               color: isSelected
                                   ? (isDark ? const Color(0xFF333333) : const Color(0xFFE0E0E0))
                                   : (isDark ? const Color(0xFF777777) : const Color(0xFF888888)),
@@ -549,124 +685,6 @@ class AppManagementDrawer extends StatelessWidget {
                           ),
                         ],
                       ),
-                    ),
-                  ),
-                ),
-              );
-            }).toList(),
-          ),
-        ],
-      ),
-    );
-  }
-
-  // --- SECTION 3: BLOKIR FITUR SPESIFIK APLIKASI ---
-
-  Widget _buildFeatureBlockSection(
-    BuildContext context,
-    AppItem app,
-    AppManagementProvider provider,
-    bool isDark,
-    Color primaryColor,
-    Color cardColor,
-  ) {
-    final theme = Theme.of(context);
-
-    return Container(
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: cardColor,
-        borderRadius: BorderRadius.circular(20),
-        // NO OUTLINES
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text(
-                'BLOKIR FITUR SPESIFIK',
-                style: theme.textTheme.labelLarge?.copyWith(
-                  fontSize: 10,
-                  letterSpacing: 1.2,
-                  fontWeight: FontWeight.w800,
-                ),
-              ),
-              Text(
-                'Komponen Adiktif',
-                style: theme.textTheme.bodyMedium?.copyWith(
-                  fontSize: 10,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 10),
-
-          Column(
-            children: app.featureBlocks.map((feat) {
-              return Padding(
-                padding: const EdgeInsets.symmetric(vertical: 4),
-                child: InkWell(
-                  onTap: () {
-                    HapticFeedback.lightImpact();
-                    provider.toggleFeatureBlock(app.id, feat.id);
-                  },
-                  borderRadius: BorderRadius.circular(12),
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 4),
-                    child: Row(
-                      children: [
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                feat.title,
-                                style: theme.textTheme.labelLarge?.copyWith(
-                                  fontSize: 12,
-                                  fontWeight: FontWeight.w700,
-                                ),
-                              ),
-                              Text(
-                                feat.description,
-                                style: theme.textTheme.bodyMedium?.copyWith(
-                                  fontSize: 10,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                        // Modern borderless toggle switch
-                        AnimatedContainer(
-                          duration: const Duration(milliseconds: 180),
-                          width: 38,
-                          height: 22,
-                          padding: const EdgeInsets.all(2.5),
-                          decoration: BoxDecoration(
-                            color: feat.isBlocked
-                                ? primaryColor
-                                : (isDark ? const Color(0xFF262626) : const Color(0xFFD4D4D4)),
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          child: AnimatedAlign(
-                            duration: const Duration(milliseconds: 180),
-                            curve: Curves.easeOutCubic,
-                            alignment: feat.isBlocked ? Alignment.centerRight : Alignment.centerLeft,
-                            child: Container(
-                              width: 17,
-                              height: 17,
-                              decoration: BoxDecoration(
-                                shape: BoxShape.circle,
-                                color: feat.isBlocked
-                                    ? (isDark ? const Color(0xFF000000) : const Color(0xFFFFFFFF))
-                                    : (isDark ? const Color(0xFF888888) : const Color(0xFFFFFFFF)),
-                              ),
-                            ),
-                          ),
-                        ),
-                      ],
                     ),
                   ),
                 ),
