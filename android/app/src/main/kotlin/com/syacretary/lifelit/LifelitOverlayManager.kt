@@ -14,44 +14,57 @@ import android.widget.TextView
 /**
  * Manages adaptive feed-masking overlay views over restricted app areas.
  *
- * Positioning Architecture:
- * - Top Search / App Bar: ~76dp left completely uncovered (no overlay window exists here).
- * - Bottom Navigation Bar: ~72dp left completely uncovered (no overlay window exists here).
- * - Feed Content Area: The overlay window is sized exactly to fit between the top bar
- *   and bottom bar.
- *
- * This ensures touches to the search bar and nav bar pass directly and natively to
- * the underlying application without any touch-modal or tap-jacking issues.
+ * Adaptive Positioning Architecture:
+ * - Dynamic Bounds: Accepts exact pixel coordinates (customTopPx, customHeightPx)
+ *   measured dynamically from AccessibilityNodeInfo (e.g. bottom of toolbar down to
+ *   top of pivot_bar).
+ * - Leaves top search bar / header and bottom navigation bar completely uncovered
+ *   so 100% of touches reach the underlying app natively.
  */
 class LifelitOverlayManager(private val context: Context) {
 
     private val windowManager = context.getSystemService(Context.WINDOW_SERVICE) as WindowManager
     private var overlayView: View? = null
+    private var currentParams: WindowManager.LayoutParams? = null
     private var isOverlayShowing = false
     private var currentActiveApp: String? = null
 
-    // Exact passthrough heights in dp
-    private val TOP_PASSTHROUGH_DP = 76   // Search bar + status bar
-    private val BOT_PASSTHROUGH_DP = 72   // Bottom navigation bar
+    // Default fallback passthrough heights in dp if node bounds are not yet computed
+    private val DEFAULT_TOP_PASSTHROUGH_DP = 96   // Status bar (~40dp) + YouTube toolbar (~56dp)
+    private val DEFAULT_BOT_PASSTHROUGH_DP = 56   // Bottom navigation bar (~56dp)
 
     fun showFeedBlockOverlay(
         appName: String,
         title: String,
         subtitle: String,
-        isDark: Boolean = true
+        isDark: Boolean = true,
+        customTopPx: Int? = null,
+        customHeightPx: Int? = null
     ) {
-        // If already showing for this exact app, avoid re-adding
-        if (isOverlayShowing && currentActiveApp == appName && overlayView != null) return
-        hideFeedBlockOverlay()
-        currentActiveApp = appName
-
         val dm = context.resources.displayMetrics
         val density = dm.density
         val screenHeight = dm.heightPixels
 
-        val topMargin = (TOP_PASSTHROUGH_DP * density).toInt()
-        val bottomMargin = (BOT_PASSTHROUGH_DP * density).toInt()
-        val overlayHeight = (screenHeight - topMargin - bottomMargin).coerceAtLeast((100 * density).toInt())
+        val topMargin = customTopPx ?: (DEFAULT_TOP_PASSTHROUGH_DP * density).toInt()
+        val overlayHeight = customHeightPx ?: (screenHeight - topMargin - (DEFAULT_BOT_PASSTHROUGH_DP * density).toInt()).coerceAtLeast((100 * density).toInt())
+
+        // If overlay is already showing for this app, update its layout bounds dynamically if needed
+        if (isOverlayShowing && currentActiveApp == appName && overlayView != null && currentParams != null) {
+            val params = currentParams!!
+            if (params.y != topMargin || params.height != overlayHeight) {
+                params.y = topMargin
+                params.height = overlayHeight
+                try {
+                    windowManager.updateViewLayout(overlayView, params)
+                } catch (e: Exception) {
+                    e.printStackTrace()
+                }
+            }
+            return
+        }
+
+        hideFeedBlockOverlay()
+        currentActiveApp = appName
 
         val overlayType = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             WindowManager.LayoutParams.TYPE_ACCESSIBILITY_OVERLAY
@@ -60,14 +73,6 @@ class LifelitOverlayManager(private val context: Context) {
             WindowManager.LayoutParams.TYPE_SYSTEM_ALERT
         }
 
-        /*
-         * Window LayoutParams:
-         * x = 0, y = topMargin
-         * width = MATCH_PARENT, height = overlayHeight
-         *
-         * Because the window itself does NOT cover y < topMargin or y > (screenHeight - bottomMargin),
-         * the system naturally routes all touches in those regions to the underlying app!
-         */
         val params = WindowManager.LayoutParams(
             WindowManager.LayoutParams.MATCH_PARENT,
             overlayHeight,
@@ -80,6 +85,7 @@ class LifelitOverlayManager(private val context: Context) {
             x = 0
             y = topMargin
         }
+        currentParams = params
 
         val bgColor = if (isDark) Color.parseColor("#0A0A0A") else Color.parseColor("#F5F5F7")
         val textColor = if (isDark) Color.parseColor("#FFFFFF") else Color.parseColor("#000000")
@@ -114,7 +120,7 @@ class LifelitOverlayManager(private val context: Context) {
                 setPadding(0, (8 * density).toInt(), 0, (14 * density).toInt())
             })
 
-            // Badge / Info
+            // Badge
             addView(TextView(context).apply {
                 text = "Lifelit • Search & Navbar Aktif"
                 setTextColor(badgeColor)
@@ -131,6 +137,7 @@ class LifelitOverlayManager(private val context: Context) {
         } catch (e: Exception) {
             e.printStackTrace()
             overlayView = null
+            currentParams = null
             isOverlayShowing = false
         }
     }
@@ -143,6 +150,7 @@ class LifelitOverlayManager(private val context: Context) {
             e.printStackTrace()
         } finally {
             overlayView = null
+            currentParams = null
             isOverlayShowing = false
             currentActiveApp = null
         }

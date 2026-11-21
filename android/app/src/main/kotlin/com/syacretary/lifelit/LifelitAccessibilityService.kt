@@ -1,10 +1,9 @@
 package com.syacretary.lifelit
 
 import android.accessibilityservice.AccessibilityService
-import android.accessibilityservice.GestureDescription
 import android.content.Context
 import android.content.Intent
-import android.graphics.Path
+import android.graphics.Rect
 import android.os.Handler
 import android.os.Looper
 import android.view.accessibility.AccessibilityEvent
@@ -14,7 +13,7 @@ import android.view.accessibility.AccessibilityNodeInfo
  * LifelitAccessibilityService
  *
  * Provides real-time smart feature blocking (Shorts, Reels, FYP, and Feeds)
- * with robust hysteresis and zero-flicker debouncing.
+ * with dynamic screen-adaptive bounds measurement and zero-flicker debouncing.
  */
 class LifelitAccessibilityService : AccessibilityService() {
 
@@ -177,10 +176,14 @@ class LifelitAccessibilityService : AccessibilityService() {
 
         if (pkg.contains("youtube")) {
             val rules = activeRules["youtube"] ?: return
-            if (rules.contains("disable_shorts") && isYouTubeShorts(root, event)) {
-                lastNavTimestamp = now
-                hideOverlayImmediate()
-                navigateToHome("com.google.android.youtube")
+            if (rules.contains("disable_shorts")) {
+                // Only redirect if user is in dedicated Shorts player, NEVER on Home feed carousel
+                val isHome = isYouTubeHomeTab(root)
+                if (!isHome && isDedicatedYouTubeShorts(root, event)) {
+                    lastNavTimestamp = now
+                    hideOverlayImmediate()
+                    navigateToHome("com.google.android.youtube")
+                }
             }
         } else if (pkg.contains("instagram")) {
             val rules = activeRules["instagram"] ?: return
@@ -231,15 +234,21 @@ class LifelitAccessibilityService : AccessibilityService() {
         if (rules.contains("disable_home")) {
             val isHome = isYouTubeHomeTab(root)
             val isSearching = isSearchActive(root, listOf("search_edit_text", "search_bar", "query"))
-            val isWatching = isYouTubeWatchPage(root)
 
-            if (isHome && !isSearching && !isWatching) {
+            // If user is on Home tab and not searching, show overlay regardless of autoplay
+            if (isHome && !isSearching) {
                 cancelPendingHide()
+
+                // Calculate exact pixel bounds from on-screen node hierarchy
+                val bounds = calculateYouTubeFeedBounds(root)
+
                 overlayManager?.showFeedBlockOverlay(
                     appName = "YouTube",
                     title = "Beranda YouTube Dibatasi",
                     subtitle = "Gunakan bilah pencarian di atas untuk menonton video yang Anda cari.",
-                    isDark = true
+                    isDark = true,
+                    customTopPx = bounds.topPx,
+                    customHeightPx = bounds.heightPx
                 )
             } else {
                 scheduleHideOverlay(350L)
@@ -249,7 +258,93 @@ class LifelitAccessibilityService : AccessibilityService() {
         }
     }
 
+    /**
+     * Measures the exact on-screen top and bottom bounds of the YouTube feed area
+     * using the bottom of the toolbar and the top of the pivot_bar navigation bar.
+     */
+    private data class FeedBounds(val topPx: Int, val heightPx: Int)
+
+    private fun calculateYouTubeFeedBounds(root: AccessibilityNodeInfo): FeedBounds {
+        val dm = resources.displayMetrics
+        val screenHeight = dm.heightPixels
+        var topPx = 0
+        var bottomPx = screenHeight
+
+        // 1. Top Bound: Bottom of Toolbar / Action Bar (search bar area)
+        val toolbarNodes = root.findAccessibilityNodeInfosByViewId("com.google.android.youtube:id/toolbar")
+        if (!toolbarNodes.isNullOrEmpty()) {
+            val rect = Rect()
+            toolbarNodes[0].getBoundsInScreen(rect)
+            if (rect.bottom > 0) {
+                topPx = rect.bottom
+            }
+        } else {
+            val searchNodes = root.findAccessibilityNodeInfosByViewId("com.google.android.youtube:id/menu_item_search")
+            if (!searchNodes.isNullOrEmpty()) {
+                val rect = Rect()
+                searchNodes[0].getBoundsInScreen(rect)
+                if (rect.bottom > 0) {
+                    topPx = rect.bottom + (4 * dm.density).toInt()
+                }
+            }
+        }
+
+        // 2. Bottom Bound: Top of Pivot Bar (bottom navigation bar)
+        val pivotNodes = root.findAccessibilityNodeInfosByViewId("com.google.android.youtube:id/pivot_bar")
+        if (!pivotNodes.isNullOrEmpty()) {
+            val rect = Rect()
+            pivotNodes[0].getBoundsInScreen(rect)
+            if (rect.top > 0) {
+                bottomPx = rect.top
+            }
+        } else {
+            val navNodes = root.findAccessibilityNodeInfosByViewId("com.google.android.youtube:id/bottom_navigation_bar")
+            if (!navNodes.isNullOrEmpty()) {
+                val rect = Rect()
+                navNodes[0].getBoundsInScreen(rect)
+                if (rect.top > 0) {
+                    bottomPx = rect.top
+                }
+            }
+        }
+
+        // Fallbacks if node detection hasn't initialized yet
+        if (topPx == 0) {
+            topPx = (96 * dm.density).toInt() // realistic status bar + toolbar
+        }
+        if (bottomPx == screenHeight) {
+            bottomPx = screenHeight - (56 * dm.density).toInt()
+        }
+
+        val heightPx = (bottomPx - topPx).coerceAtLeast((100 * dm.density).toInt())
+        return FeedBounds(topPx, heightPx)
+    }
+
     private fun isYouTubeHomeTab(root: AccessibilityNodeInfo): Boolean {
+        // 1. Check if other tabs are explicitly selected in pivot_bar
+        val otherTabLabels = listOf("Subscriptions", "Subskripsi", "You", "Koleksi", "Akun")
+        for (label in otherTabLabels) {
+            val nodes = root.findAccessibilityNodeInfosByText(label)
+            if (!nodes.isNullOrEmpty()) {
+                for (n in nodes) {
+                    if (n.isSelected || n.isChecked) return false
+                    val p = n.parent
+                    if (p != null && (p.isSelected || p.isChecked)) return false
+                }
+            }
+        }
+
+        // 2. Check if Shorts tab is selected
+        val shortsNodes = root.findAccessibilityNodeInfosByText("Shorts")
+        if (!shortsNodes.isNullOrEmpty()) {
+            for (n in shortsNodes) {
+                if (n.isSelected || n.isChecked) return false
+                val p = n.parent
+                if (p != null && (p.isSelected || p.isChecked)) return false
+            }
+        }
+
+        // 3. Check if Home tab is selected
         val homeLabels = listOf("Beranda", "Home")
         for (label in homeLabels) {
             val nodes = root.findAccessibilityNodeInfosByText(label)
@@ -261,42 +356,35 @@ class LifelitAccessibilityService : AccessibilityService() {
                 }
             }
         }
-        return false
+
+        // Fallback: If pivot_bar is present and no other tab is selected, default to Home
+        val pivotNodes = root.findAccessibilityNodeInfosByViewId("com.google.android.youtube:id/pivot_bar")
+        return !pivotNodes.isNullOrEmpty()
     }
 
-    private fun isYouTubeWatchPage(root: AccessibilityNodeInfo): Boolean {
-        val watchIds = listOf(
-            "com.google.android.youtube:id/watch_player",
-            "com.google.android.youtube:id/watch_panel",
-            "com.google.android.youtube:id/player_fragment_container",
-            "com.google.android.youtube:id/player_control_play_pause_replay_button"
-        )
-        for (id in watchIds) {
-            if (!root.findAccessibilityNodeInfosByViewId(id).isNullOrEmpty()) return true
-        }
-        return false
-    }
-
-    private fun isYouTubeShorts(root: AccessibilityNodeInfo, event: AccessibilityEvent?): Boolean {
-        val shortsIds = listOf(
-            "com.google.android.youtube:id/reel_watch_fragment_root",
-            "com.google.android.youtube:id/reel_recycler",
-            "com.google.android.youtube:id/shorts_player_root"
-        )
-        for (id in shortsIds) {
-            if (!root.findAccessibilityNodeInfosByViewId(id).isNullOrEmpty()) return true
-        }
-        val cls = event?.className?.toString() ?: ""
-        if (cls.contains("Shorts", ignoreCase = true) || cls.contains("ShortsPlayer", ignoreCase = true)) return true
-        if (findNodeByViewId(root, listOf("reel_watch", "shorts_bottom"))) return true
-        val shortsBarNode = root.findAccessibilityNodeInfosByText("Shorts")
-        if (!shortsBarNode.isNullOrEmpty()) {
-            for (n in shortsBarNode) {
+    private fun isDedicatedYouTubeShorts(root: AccessibilityNodeInfo, event: AccessibilityEvent?): Boolean {
+        // Check if Shorts tab is explicitly selected in bottom navigation
+        val shortsNodes = root.findAccessibilityNodeInfosByText("Shorts")
+        if (!shortsNodes.isNullOrEmpty()) {
+            for (n in shortsNodes) {
                 if (n.isSelected || n.isChecked) return true
                 val p = n.parent
                 if (p != null && (p.isSelected || p.isChecked)) return true
             }
         }
+
+        // Check if full-screen reel player is active (toolbar must be absent)
+        val toolbarNodes = root.findAccessibilityNodeInfosByViewId("com.google.android.youtube:id/toolbar")
+        val isToolbarAbsent = toolbarNodes.isNullOrEmpty()
+
+        if (isToolbarAbsent) {
+            val reelWatchNodes = root.findAccessibilityNodeInfosByViewId("com.google.android.youtube:id/reel_watch_fragment_root")
+            if (!reelWatchNodes.isNullOrEmpty()) return true
+
+            val cls = event?.className?.toString() ?: ""
+            if (cls.contains("ShortsPlayer", ignoreCase = true) || cls.contains("Reel", ignoreCase = true)) return true
+        }
+
         return false
     }
 
@@ -308,7 +396,6 @@ class LifelitAccessibilityService : AccessibilityService() {
             return
         }
 
-        // Strict DM & Profile Only mode
         if (rules.contains("dm_profile_only")) {
             val inDm = isInstagramDM(root)
             val inProfile = isInstagramProfile(root)
@@ -324,16 +411,18 @@ class LifelitAccessibilityService : AccessibilityService() {
             }
         }
 
-        // Feed overlay
         if (rules.contains("disable_feeds") || rules.contains("disable_home")) {
             val isHome = isInstagramHome(root)
             if (isHome) {
                 cancelPendingHide()
+                val bounds = calculateInstagramFeedBounds(root)
                 overlayManager?.showFeedBlockOverlay(
                     appName = "Instagram",
                     title = "Feeds Instagram Dibatasi",
                     subtitle = "DM & halaman Profil tetap dapat diakses normal.",
-                    isDark = true
+                    isDark = true,
+                    customTopPx = bounds.topPx,
+                    customHeightPx = bounds.heightPx
                 )
             } else {
                 scheduleHideOverlay(350L)
@@ -341,6 +430,33 @@ class LifelitAccessibilityService : AccessibilityService() {
         } else {
             hideOverlayImmediate()
         }
+    }
+
+    private fun calculateInstagramFeedBounds(root: AccessibilityNodeInfo): FeedBounds {
+        val dm = resources.displayMetrics
+        val screenHeight = dm.heightPixels
+        var topPx = 0
+        var bottomPx = screenHeight
+
+        val actionBars = root.findAccessibilityNodeInfosByViewId("com.instagram.android:id/action_bar_container")
+        if (!actionBars.isNullOrEmpty()) {
+            val rect = Rect()
+            actionBars[0].getBoundsInScreen(rect)
+            if (rect.bottom > 0) topPx = rect.bottom
+        }
+
+        val tabBars = root.findAccessibilityNodeInfosByViewId("com.instagram.android:id/tab_bar")
+        if (!tabBars.isNullOrEmpty()) {
+            val rect = Rect()
+            tabBars[0].getBoundsInScreen(rect)
+            if (rect.top > 0) bottomPx = rect.top
+        }
+
+        if (topPx == 0) topPx = (90 * dm.density).toInt()
+        if (bottomPx == screenHeight) bottomPx = screenHeight - (56 * dm.density).toInt()
+
+        val heightPx = (bottomPx - topPx).coerceAtLeast((100 * dm.density).toInt())
+        return FeedBounds(topPx, heightPx)
     }
 
     private fun isInstagramHome(root: AccessibilityNodeInfo): Boolean {
