@@ -46,12 +46,30 @@ object TikTokNavigation {
      * Identifies the currently active bottom navigation tab in TikTok.
      */
     fun getActiveTab(root: AccessibilityNodeInfo): TikTokTab {
-        // 1. Check bottom navigation tabs
+        // 1. Check exact resource IDs from verified TikTok hierarchy
+        val idTabs = listOf(
+            listOf("com.ss.android.ugc.trill:id/oqe", "com.zhiliaoapp.musically:id/oqe") to TikTokTab.INBOX,
+            listOf("com.ss.android.ugc.trill:id/oqf", "com.zhiliaoapp.musically:id/oqf") to TikTokTab.PROFILE,
+            listOf("com.ss.android.ugc.trill:id/oqd", "com.zhiliaoapp.musically:id/oqd") to TikTokTab.HOME,
+            listOf("com.ss.android.ugc.trill:id/etc", "com.zhiliaoapp.musically:id/etc") to TikTokTab.FRIENDS
+        )
+        for ((ids, tab) in idTabs) {
+            for (id in ids) {
+                val nodes = root.findAccessibilityNodeInfosByViewId(id)
+                if (!nodes.isNullOrEmpty()) {
+                    for (node in nodes) {
+                        if (isTabSelected(node)) return tab
+                    }
+                }
+            }
+        }
+
+        // 2. Check bottom navigation tabs by text and content-desc
         val bottomTabs = listOf(
-            listOf("Beranda", "Home") to TikTokTab.HOME,
-            listOf("Teman", "Friends", "Now") to TikTokTab.FRIENDS,
             listOf("Kotak Masuk", "Inbox", "Pesan", "Notifications") to TikTokTab.INBOX,
-            listOf("Profil", "Profile", "Saya", "Me") to TikTokTab.PROFILE
+            listOf("Profil", "Profile", "Saya", "Me") to TikTokTab.PROFILE,
+            listOf("Beranda", "Home") to TikTokTab.HOME,
+            listOf("Teman", "Friends", "Now", "Shop") to TikTokTab.FRIENDS
         )
 
         for ((keywords, tab) in bottomTabs) {
@@ -67,7 +85,7 @@ object TikTokNavigation {
             }
         }
 
-        // 2. Direct screen content verification
+        // 3. Direct screen content verification
         if (isInsideDM(root)) return TikTokTab.INBOX
         if (isInsideProfile(root)) return TikTokTab.PROFILE
 
@@ -136,6 +154,21 @@ object TikTokNavigation {
      * Navigates to TikTok Inbox tab.
      */
     fun clickInbox(root: AccessibilityNodeInfo): Boolean {
+        // 1. Direct ID click
+        val inboxIds = listOf("com.ss.android.ugc.trill:id/oqe", "com.zhiliaoapp.musically:id/oqe")
+        for (id in inboxIds) {
+            val nodes = root.findAccessibilityNodeInfosByViewId(id)
+            if (!nodes.isNullOrEmpty()) {
+                for (n in nodes) {
+                    if (AccessibilityUtils.clickNodeOrDescendant(n)) {
+                        recordDMAccess()
+                        return true
+                    }
+                }
+            }
+        }
+
+        // 2. Keyword & text search
         val inboxKeywords = listOf("Kotak Masuk", "Inbox", "Pesan", "Notifications")
         for (kw in inboxKeywords) {
             val node = AccessibilityUtils.findClickableNode(root, listOf(kw))
@@ -160,6 +193,18 @@ object TikTokNavigation {
      * Navigates to TikTok Profile tab.
      */
     fun clickProfile(root: AccessibilityNodeInfo): Boolean {
+        // 1. Direct ID click
+        val profileIds = listOf("com.ss.android.ugc.trill:id/oqf", "com.zhiliaoapp.musically:id/oqf")
+        for (id in profileIds) {
+            val nodes = root.findAccessibilityNodeInfosByViewId(id)
+            if (!nodes.isNullOrEmpty()) {
+                for (n in nodes) {
+                    if (AccessibilityUtils.clickNodeOrDescendant(n)) return true
+                }
+            }
+        }
+
+        // 2. Keyword & text search
         val profileKeywords = listOf("Profil", "Profile", "Saya", "Me")
         for (kw in profileKeywords) {
             val node = AccessibilityUtils.findClickableNode(root, listOf(kw))
