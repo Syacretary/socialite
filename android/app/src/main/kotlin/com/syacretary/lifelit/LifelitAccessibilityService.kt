@@ -114,9 +114,26 @@ class LifelitAccessibilityService : AccessibilityService() {
             "com.samsung.android.honeyboard"
         )
 
+        private val TIKTOK_PACKAGES = setOf(
+            "com.zhiliaoapp.musically",
+            "com.ss.android.ugc.trill",
+            "com.zhiliaoapp.musically.go"
+        )
+
+        /**
+         * Strict package comparison: exact match, or a sub-package of [target]
+         * (dot boundary). Never a loose substring match, so e.g. Threads
+         * (com.instagram.barcelona) is not mistaken for Instagram.
+         */
+        fun matchesPackage(pkg: String, target: String): Boolean {
+            if (target.isEmpty() || pkg.isEmpty()) return false
+            return pkg == target || pkg.startsWith("$target.")
+        }
+
         fun isTransientPackage(pkg: String): Boolean {
+            if (pkg.isEmpty()) return false
             if (pkg == "android") return true
-            return TRANSIENT_SYSTEM_PACKAGES.any { it != "android" && (pkg.contains(it, ignoreCase = true) || it.contains(pkg, ignoreCase = true)) }
+            return TRANSIENT_SYSTEM_PACKAGES.any { it != "android" && matchesPackage(pkg, it) }
         }
 
         fun isServiceRunning(): Boolean = instance != null
@@ -148,9 +165,10 @@ class LifelitAccessibilityService : AccessibilityService() {
         fun loadLimitsFromPrefs(context: Context) {
             try {
                 val prefs = context.getSharedPreferences(PREFS_CONFIG, Context.MODE_PRIVATE)
-                val raw = prefs.getString(KEY_CONFIG, null) ?: return
-                val json = JSONObject(raw)
+                val raw = prefs.getString(KEY_CONFIG, null)
                 activeLimits.clear()
+                if (raw.isNullOrEmpty()) return
+                val json = JSONObject(raw)
                 val keys = json.keys()
                 while (keys.hasNext()) {
                     val appId = keys.next()
@@ -176,6 +194,8 @@ class LifelitAccessibilityService : AccessibilityService() {
                         }
                         if (blocked.isNotEmpty()) {
                             activeRules[appId] = blocked
+                        } else {
+                            activeRules.remove(appId)
                         }
                     }
                 }
@@ -190,6 +210,41 @@ class LifelitAccessibilityService : AccessibilityService() {
         instance = this
         ensureInitialized()
         loadTrackedUsage()
+        registerScreenReceiver()
+    }
+
+    // Stop the live usage clock while the screen is off so locked-phone time is
+    // not counted against the user's daily limit.
+    private var screenReceiver: android.content.BroadcastReceiver? = null
+
+    private fun registerScreenReceiver() {
+        if (screenReceiver != null) return
+        val receiver = object : android.content.BroadcastReceiver() {
+            override fun onReceive(context: Context?, intent: Intent?) {
+                if (intent?.action == Intent.ACTION_SCREEN_OFF) {
+                    cancelPendingHide()
+                    cancelPendingEval()
+                    updateForeground(null)
+                    overlayManager?.hideAllOverlays()
+                }
+            }
+        }
+        try {
+            registerReceiver(receiver, android.content.IntentFilter(Intent.ACTION_SCREEN_OFF))
+            screenReceiver = receiver
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+    }
+
+    private fun unregisterScreenReceiver() {
+        screenReceiver?.let {
+            try {
+                unregisterReceiver(it)
+            } catch (_: Exception) {
+            }
+        }
+        screenReceiver = null
     }
 
     private fun ensureInitialized() {
@@ -212,6 +267,7 @@ class LifelitAccessibilityService : AccessibilityService() {
     }
 
     override fun onDestroy() {
+        unregisterScreenReceiver()
         cancelPendingHide()
         cancelPendingEval()
         stopLimitCheckLoop()
@@ -237,7 +293,7 @@ class LifelitAccessibilityService : AccessibilityService() {
         // 1. Our own windows. Ignore overlay events, but if the real Lifelit
         //    activity comes to the foreground (e.g. the blocker's "Kembali ke
         //    Lifelit" button), make sure no intervention window is left on top.
-        if (pkg.contains("com.syacretary.lifelit")) {
+        if (matchesPackage(pkg, "com.syacretary.lifelit")) {
             val className = event.className?.toString() ?: ""
             if (className.contains("MainActivity") || className.contains("FlutterActivity")) {
                 updateForeground(null)
@@ -413,6 +469,12 @@ class LifelitAccessibilityService : AccessibilityService() {
             lastInterventionAt.clear()
             usagePrefs.edit().clear().putString("date", today).apply()
 
+            // Invalidate the cached UsageStats value so yesterday's total can't
+            // trigger a block right after midnight.
+            lastSystemUsageCheckAt = 0L
+            lastSystemUsagePkg = ""
+            lastSystemUsageMs = 0L
+
             // If a session was already running across midnight, restart its
             // baseline so yesterday's time is not counted for today.
             if (foregroundPkg != null) {
@@ -516,6 +578,10 @@ class LifelitAccessibilityService : AccessibilityService() {
                         isTimeLimitExceeded(pkg, limit.dailyLimitMinutes)
                     ) {
                         enforceTimeLimit(pkg, limit)
+                    } else if (overlayManager?.isBlockingInterventionShowing == true) {
+                        // Limit was raised/removed (or a new day began) while the
+                        // blocker was up: release the screen.
+                        overlayManager?.hideAllOverlays()
                     }
                 }
                 handler.postDelayed(this, LIMIT_CHECK_INTERVAL_MS)
@@ -581,7 +647,7 @@ class LifelitAccessibilityService : AccessibilityService() {
     private fun findHandlerForPackage(pkg: String): AppFeatureHandler? {
         if (!::featureHandlers.isInitialized) return null
         return featureHandlers.firstOrNull { h ->
-            h.supportedPackages.any { pkg.contains(it) || it.contains(pkg) }
+            h.supportedPackages.any { matchesPackage(pkg, it) }
         }
     }
 
@@ -592,21 +658,20 @@ class LifelitAccessibilityService : AccessibilityService() {
     private fun findLimitForPackage(pkg: String): NativeAppLimit? {
         activeLimits[pkg]?.let { return it }
         return activeLimits.values.firstOrNull { limit ->
-            pkg.contains(limit.packageName, ignoreCase = true) ||
-                limit.packageName.contains(pkg, ignoreCase = true) ||
-                (limit.appId == "tiktok" && (pkg.contains("musically") || pkg.contains("trill")))
+            matchesPackage(pkg, limit.packageName) ||
+                (limit.appId == "tiktok" && TIKTOK_PACKAGES.any { matchesPackage(pkg, it) })
         }
     }
 
     private fun getRulesForPackage(pkg: String): Set<String> {
         val appKey = when {
-            pkg.contains("instagram") -> "instagram"
-            pkg.contains("youtube") -> "youtube"
-            pkg.contains("musically") || pkg.contains("trill") -> "tiktok"
-            pkg.contains("twitter") -> "x_twitter"
-            else -> ""
+            matchesPackage(pkg, "com.instagram.android") -> "instagram"
+            matchesPackage(pkg, "com.google.android.youtube") -> "youtube"
+            TIKTOK_PACKAGES.any { matchesPackage(pkg, it) } -> "tiktok"
+            matchesPackage(pkg, "com.twitter.android") -> "x_twitter"
+            else -> return emptySet()
         }
-        return activeRules[appKey] ?: activeRules["twitter"] ?: emptySet()
+        return activeRules[appKey] ?: emptySet()
     }
 
     private fun scheduleEvaluation(delayMs: Long) {
@@ -698,7 +763,7 @@ class LifelitAccessibilityService : AccessibilityService() {
         }
 
         // If the focused window is a transient system element or our own overlay
-        val isTransientOrOurOverlay = pkg.contains("com.syacretary.lifelit") || isTransientPackage(pkg)
+        val isTransientOrOurOverlay = matchesPackage(pkg, "com.syacretary.lifelit") || isTransientPackage(pkg)
         if (isTransientOrOurOverlay) {
             try {
                 val windowList = windows
