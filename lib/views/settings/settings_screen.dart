@@ -460,7 +460,12 @@ class SettingsScreen extends StatelessWidget {
       ),
       child: Row(
         children: [
-          Icon(Icons.blur_on_rounded, size: 18, color: primaryColor),
+          Image.asset(
+            isDark ? 'assets/icons/lifelit_white.png' : 'assets/icons/lifelit_black.png',
+            width: 22,
+            height: 22,
+            fit: BoxFit.contain,
+          ),
           const SizedBox(width: 10),
           Expanded(
             child: Column(

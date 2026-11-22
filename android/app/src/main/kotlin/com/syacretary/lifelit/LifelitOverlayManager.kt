@@ -102,6 +102,22 @@ class LifelitOverlayManager(private val context: Context) {
             )
             isClickable = true // Absorb touches in the feed area
 
+            // Lifelit Brand Emblem
+            val iconResId = context.resources.getIdentifier("ic_notification", "drawable", context.packageName)
+            if (iconResId != 0) {
+                addView(android.widget.ImageView(context).apply {
+                    setImageResource(iconResId)
+                    val iconSize = (32 * density).toInt()
+                    layoutParams = LinearLayout.LayoutParams(iconSize, iconSize).apply {
+                        gravity = Gravity.CENTER
+                        bottomMargin = (12 * density).toInt()
+                    }
+                    if (!isDark) {
+                        setColorFilter(Color.parseColor("#111111"))
+                    }
+                })
+            }
+
             // Title
             addView(TextView(context).apply {
                 text = title

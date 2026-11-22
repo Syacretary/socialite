@@ -11,18 +11,30 @@ class CustomHeader extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
 
     return Padding(
       padding: const EdgeInsets.fromLTRB(20, 16, 20, 10),
-      child: Align(
-        alignment: Alignment.centerLeft,
-        child: Text(
-          title,
-          style: theme.textTheme.displayMedium?.copyWith(
-            fontWeight: FontWeight.w800,
-            letterSpacing: -1.0,
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: [
+          Image.asset(
+            isDark ? 'assets/icons/lifelit_white.png' : 'assets/icons/lifelit_black.png',
+            width: 24,
+            height: 24,
+            fit: BoxFit.contain,
           ),
-        ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              title,
+              style: theme.textTheme.displayMedium?.copyWith(
+                fontWeight: FontWeight.w800,
+                letterSpacing: -1.0,
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
