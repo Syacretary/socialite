@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:flutter/scheduler.dart';
 import '../models/app_item.dart';
 import '../services/feature_block_service.dart';
 
@@ -125,47 +126,66 @@ class AppManagementProvider extends ChangeNotifier {
   bool get isDraggingOverAvailableZone => _isDraggingOverAvailableZone;
   bool get hasCheckedInstalledApps => _hasCheckedInstalledApps;
 
+  /// Whether persistent config has been loaded from native SharedPreferences.
+  bool _configLoaded = false;
+  bool _installedChecked = false;
+
   AppManagementProvider() {
-    _loadPersistentConfig();
-    checkInstalledApps();
+    // Load config first, then check installed apps.
+    // syncRules is deferred until BOTH are ready AND after the first frame
+    // so the Flutter MethodChannel is guaranteed to be initialized.
+    _loadPersistentConfig().then((_) {
+      checkInstalledApps();
+    });
+  }
+
+  /// Called once installed packages are confirmed AND config is loaded.
+  void _onReadySync() {
+    if (!_configLoaded || !_installedChecked) return;
+    // Defer to post-frame so MethodChannel is fully initialized.
+    SchedulerBinding.instance.addPostFrameCallback((_) {
+      FeatureBlockService.syncRules(this);
+    });
   }
 
   Future<void> _loadPersistentConfig() async {
     try {
       final raw = await FeatureBlockService.loadAppConfig();
-      if (raw == null || raw.isEmpty) return;
-      final Map<String, dynamic> configMap = jsonDecode(raw);
+      if (raw != null && raw.isNotEmpty) {
+        final Map<String, dynamic> configMap = jsonDecode(raw);
 
-      for (var i = 0; i < _apps.length; i++) {
-        final appId = _apps[i].id;
-        if (!configMap.containsKey(appId)) continue;
-        final appData = configMap[appId] as Map<String, dynamic>;
+        for (var i = 0; i < _apps.length; i++) {
+          final appId = _apps[i].id;
+          if (!configMap.containsKey(appId)) continue;
+          final appData = configMap[appId] as Map<String, dynamic>;
 
-        final isRestricted = appData['isRestricted'] as bool? ?? _apps[i].isRestricted;
-        final dailyLimitMinutes = appData['dailyLimitMinutes'] as int? ?? _apps[i].dailyLimitMinutes;
-        final actionIdx = appData['actionOnLimit'] as int? ?? _apps[i].actionOnLimit.index;
-        final actionOnLimit = LimitAction.values[actionIdx.clamp(0, LimitAction.values.length - 1)];
+          final isRestricted = appData['isRestricted'] as bool? ?? _apps[i].isRestricted;
+          final dailyLimitMinutes = appData['dailyLimitMinutes'] as int? ?? _apps[i].dailyLimitMinutes;
+          final actionIdx = appData['actionOnLimit'] as int? ?? _apps[i].actionOnLimit.index;
+          final actionOnLimit = LimitAction.values[actionIdx.clamp(0, LimitAction.values.length - 1)];
 
-        var features = List<AppFeatureBlock>.from(_apps[i].featureBlocks);
-        if (appData.containsKey('features')) {
-          final featMap = appData['features'] as Map<String, dynamic>;
-          for (var j = 0; j < features.length; j++) {
-            if (featMap.containsKey(features[j].id)) {
-              features[j] = features[j].copyWith(isBlocked: featMap[features[j].id] as bool);
+          var features = List<AppFeatureBlock>.from(_apps[i].featureBlocks);
+          if (appData.containsKey('features')) {
+            final featMap = appData['features'] as Map<String, dynamic>;
+            for (var j = 0; j < features.length; j++) {
+              if (featMap.containsKey(features[j].id)) {
+                features[j] = features[j].copyWith(isBlocked: featMap[features[j].id] as bool);
+              }
             }
           }
-        }
 
-        _apps[i] = _apps[i].copyWith(
-          isRestricted: isRestricted,
-          dailyLimitMinutes: dailyLimitMinutes,
-          actionOnLimit: actionOnLimit,
-        );
-        _apps[i].featureBlocks = features;
+          _apps[i] = _apps[i].copyWith(
+            isRestricted: isRestricted,
+            dailyLimitMinutes: dailyLimitMinutes,
+            actionOnLimit: actionOnLimit,
+            featureBlocks: features,
+          );
+        }
+        notifyListeners();
       }
-      notifyListeners();
-      FeatureBlockService.syncRules(this);
     } catch (_) {}
+    _configLoaded = true;
+    _onReadySync();
   }
 
   void _savePersistentConfig() {
@@ -193,8 +213,14 @@ class AppManagementProvider extends ChangeNotifier {
     final installed = await FeatureBlockService.getInstalledPackages(candidatePkgs);
     _installedPackages = installed.toSet();
     _hasCheckedInstalledApps = true;
+    _installedChecked = true;
     notifyListeners();
+    _onReadySync();
   }
+
+  /// Returns all configured apps without filtering by installed status.
+  /// Used by FeatureBlockService to ensure all active rules are synced to native accessibility service.
+  List<AppItem> get rawApps => List.unmodifiable(_apps);
 
   List<AppItem> get allApps {
     if (!_hasCheckedInstalledApps) return List.unmodifiable(_apps);

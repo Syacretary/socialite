@@ -85,7 +85,7 @@ class FeatureBlockService {
     try {
       final Map<String, List<String>> rulesMap = {};
 
-      for (final app in provider.allApps) {
+      for (final app in provider.rawApps) {
         if (!app.hasFeatureBlocks) continue;
 
         final blockedFeatureIds = app.featureBlocks

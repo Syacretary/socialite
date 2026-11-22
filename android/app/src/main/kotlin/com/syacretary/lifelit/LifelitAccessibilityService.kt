@@ -79,6 +79,11 @@ class LifelitAccessibilityService : AccessibilityService() {
             "com.samsung.android.honeyboard"
         )
 
+        fun isTransientPackage(pkg: String): Boolean {
+            if (pkg == "android") return true
+            return TRANSIENT_SYSTEM_PACKAGES.any { it != "android" && (pkg.contains(it, ignoreCase = true) || it.contains(pkg, ignoreCase = true)) }
+        }
+
         fun isServiceRunning(): Boolean = instance != null
 
         fun syncRules(context: Context, rules: Map<String, List<String>>) {
@@ -122,6 +127,22 @@ class LifelitAccessibilityService : AccessibilityService() {
                     if (isRestricted && pkg.isNotBlank()) {
                         activeLimits[pkg] = NativeAppLimit(appId, pkg, isRestricted, dailyLimit, action)
                     }
+
+                    // Also load feature rules directly from config to ensure full sync
+                    val feats = obj.optJSONObject("features")
+                    if (feats != null) {
+                        val blocked = mutableSetOf<String>()
+                        val fKeys = feats.keys()
+                        while (fKeys.hasNext()) {
+                            val fKey = fKeys.next()
+                            if (feats.optBoolean(fKey, false)) {
+                                blocked.add(fKey)
+                            }
+                        }
+                        if (blocked.isNotEmpty()) {
+                            activeRules[appId] = blocked
+                        }
+                    }
                 }
             } catch (e: Exception) {
                 e.printStackTrace()
@@ -132,15 +153,27 @@ class LifelitAccessibilityService : AccessibilityService() {
     override fun onServiceConnected() {
         super.onServiceConnected()
         instance = this
-        overlayManager = LifelitOverlayManager(this)
-        featureHandlers = listOf(
-            InstagramHandler(),
-            YouTubeHandler(),
-            TikTokHandler(),
-            TwitterHandler()
-        )
+        ensureInitialized()
         loadRulesFromPrefs(this)
         loadLimitsFromPrefs(this)
+    }
+
+    private fun ensureInitialized() {
+        if (overlayManager == null) {
+            overlayManager = LifelitOverlayManager(this)
+        }
+        if (!::featureHandlers.isInitialized) {
+            featureHandlers = listOf(
+                InstagramHandler(),
+                YouTubeHandler(),
+                TikTokHandler(),
+                TwitterHandler()
+            )
+        }
+        if (activeRules.isEmpty() || activeLimits.isEmpty()) {
+            loadRulesFromPrefs(this)
+            loadLimitsFromPrefs(this)
+        }
     }
 
     override fun onDestroy() {
@@ -165,14 +198,24 @@ class LifelitAccessibilityService : AccessibilityService() {
         // 1. Ignore our own overlay window
         if (pkg.contains("com.syacretary.lifelit")) return
 
-        // 2. Ignore transient system overlays (smart edge/sidebar, heads-up notifications, volume slider, keyboard).
-        // This prevents users from dismissing the overlay by triggering smart edge panels or notifications.
-        val isTransient = TRANSIENT_SYSTEM_PACKAGES.any { pkg.contains(it, ignoreCase = true) }
-        if (isTransient) {
-            return
-        }
+        ensureInitialized()
 
         val handler = findHandlerForPackage(pkg)
+
+        // 2. If it is NOT a managed app, handle transient system overlays and window transitions
+        if (handler == null) {
+            val isTransient = isTransientPackage(pkg)
+            if (isTransient) {
+                // Transient system overlay (smart edge, notification, keyboard) -> Do not dismiss current overlay
+                return
+            }
+
+            // Genuinely exiting to another user app (e.g. Launcher, Settings, WhatsApp) -> Hide overlay
+            if (event.eventType == AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED) {
+                hideOverlayImmediate()
+            }
+            return
+        }
 
         // 3. Native Screen Time Limit Enforcement (runs completely standalone in background)
         val limitConfig = activeLimits[pkg]
@@ -191,17 +234,7 @@ class LifelitAccessibilityService : AccessibilityService() {
             }
         }
 
-        // 4. If genuinely exiting to another user app (e.g. Launcher, Settings, WhatsApp), hide overlay
-        if (event.eventType == AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED) {
-            if (handler == null) {
-                hideOverlayImmediate()
-                return
-            }
-        }
-
-        if (handler == null) return
-
-        // 5. Fast redirect check for Shorts / Reels / Stories / Home
+        // 4. Fast redirect check for Shorts / Reels / Stories / Home
         val root = rootInActiveWindow
         if (root != null) {
             val rules = getRulesForPackage(pkg)
@@ -214,7 +247,7 @@ class LifelitAccessibilityService : AccessibilityService() {
             }
         }
 
-        // 6. Debounced layout and state evaluation
+        // 5. Debounced layout and state evaluation
         scheduleEvaluation(100L)
     }
 
@@ -248,10 +281,10 @@ class LifelitAccessibilityService : AccessibilityService() {
             pkg.contains("instagram") -> "instagram"
             pkg.contains("youtube") -> "youtube"
             pkg.contains("musically") || pkg.contains("trill") -> "tiktok"
-            pkg.contains("twitter") -> "twitter"
+            pkg.contains("twitter") -> "x_twitter"
             else -> ""
         }
-        return activeRules[appKey] ?: emptySet()
+        return activeRules[appKey] ?: activeRules["twitter"] ?: emptySet()
     }
 
     private fun scheduleEvaluation(delayMs: Long) {
@@ -320,7 +353,7 @@ class LifelitAccessibilityService : AccessibilityService() {
 
     /**
      * Resolves the active root node for managed apps while remaining immune
-     * to transient system windows (smart sidebar, floating tools, notification popups).
+     * to transient system windows (smart sidebar, floating tools, notification popups, our own overlay).
      */
     private fun getActiveManagedRoot(): android.view.accessibility.AccessibilityNodeInfo? {
         val root = rootInActiveWindow
@@ -331,8 +364,9 @@ class LifelitAccessibilityService : AccessibilityService() {
             return root
         }
 
-        // If the focused window is a transient system element (smart edge, heads-up notification, etc.)
-        if (TRANSIENT_SYSTEM_PACKAGES.any { pkg.contains(it, ignoreCase = true) }) {
+        // If the focused window is a transient system element or our own overlay
+        val isTransientOrOurOverlay = pkg.contains("com.syacretary.lifelit") || isTransientPackage(pkg)
+        if (isTransientOrOurOverlay) {
             try {
                 val windowList = windows
                 for (w in windowList) {
