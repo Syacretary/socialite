@@ -236,6 +236,22 @@ object TikTokNavigation {
     }
 
     /**
+     * Detects if the "Following" / "Mengikuti" tab is selected on Home feed.
+     */
+    fun isFollowingTabSelected(root: AccessibilityNodeInfo): Boolean {
+        val followingKeywords = listOf("Mengikuti", "Following", "Friends", "Teman")
+        for (kw in followingKeywords) {
+            val nodes = root.findAccessibilityNodeInfosByText(kw)
+            if (!nodes.isNullOrEmpty()) {
+                for (node in nodes) {
+                    if (isTabSelected(node) || isTabSelected(node.parent)) return true
+                }
+            }
+        }
+        return false
+    }
+
+    /**
      * Switches from FYP to "Mengikuti" / "Following" tab.
      */
     fun clickFollowingTab(root: AccessibilityNodeInfo): Boolean {
