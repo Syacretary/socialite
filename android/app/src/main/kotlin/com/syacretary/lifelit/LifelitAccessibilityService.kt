@@ -353,8 +353,8 @@ class LifelitAccessibilityService : AccessibilityService() {
             }
         }
 
-        // 5. Debounced layout and state evaluation
-        scheduleEvaluation(100L)
+        // 5. Debounced layout and state evaluation — immediate on next frame so overlay appears instantly
+        scheduleEvaluation(0L)
     }
 
     /**

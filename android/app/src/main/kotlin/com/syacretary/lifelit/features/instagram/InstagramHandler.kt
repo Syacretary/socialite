@@ -16,7 +16,7 @@ class InstagramHandler : AppFeatureHandler {
     override val supportedPackages: Set<String> = setOf("com.instagram.android")
 
     private var lastNavTimestamp = 0L
-    private val NAV_COOLDOWN_MS = 1400L
+    private val NAV_COOLDOWN_MS = 400L
 
     override fun onFastRedirect(
         service: AccessibilityService,
@@ -104,18 +104,13 @@ class InstagramHandler : AppFeatureHandler {
                 hideImmediate()
                 return
             }
-            scheduleHide(150L)
+            scheduleHide(50L)
             return
         }
 
-        // 3. Search / Explore tab
+        // 3. Search / Explore tab — NEVER redirect to DM, always free to search
         if (activeTab == InstagramTab.SEARCH) {
-            if (feedsBlocked) {
-                val bounds = InstagramFeedsFeature.calculateExploreBounds(service, root)
-                InstagramFeedsFeature.showExploreFeedOverlay(overlayManager, bounds)
-                return
-            }
-            scheduleHide(150L)
+            scheduleHide(40L)
             return
         }
 

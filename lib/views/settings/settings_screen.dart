@@ -2,9 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import '../../core/localization/app_localizations.dart';
-import '../../providers/screentime_provider.dart';
 import '../../providers/settings_provider.dart';
 import '../widgets/custom_app_bar.dart';
+import '../../core/animation/staggered_content.dart';
+import '../../core/animation/rubber_band_scroll.dart';
+import '../../core/animation/ease_toggle_button.dart';
 
 class SettingsScreen extends StatelessWidget {
   const SettingsScreen({super.key});
@@ -12,7 +14,6 @@ class SettingsScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final settings = Provider.of<SettingsProvider>(context);
-    final screentime = Provider.of<ScreentimeProvider>(context);
     final loc = AppLocalizations(settings.languageCode);
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
@@ -30,15 +31,15 @@ class SettingsScreen extends StatelessWidget {
                 // Clean Header
                 CustomHeader(title: loc.get('settingsTitle')),
 
-                // Feather scroll wrapper with stable native scroll
+                // Rubber-band scroll with staggered reveal
                 Expanded(
                   child: FeatherScrollWrapper(
-                    child: SingleChildScrollView(
-                      physics: const AlwaysScrollableScrollPhysics(),
+                    child: RubberBandScrollView(
                       padding: const EdgeInsets.fromLTRB(16, 2, 16, 80),
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min, // Hug content
-                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                      child: StaggeredContent(
+                        duration: const Duration(milliseconds: 500),
+                        staggerDelay: const Duration(milliseconds: 120),
+                        curves: Curves.easeOut,
                         children: [
                           // LANGUAGE SELECTOR
                           _buildLanguageSection(context, loc, isDark, settings, primaryColor),
@@ -51,7 +52,7 @@ class SettingsScreen extends StatelessWidget {
                           const SizedBox(height: 10),
 
                           // PERMISSIONS SECTION
-                          _buildPermissionsSection(context, loc, isDark, settings, screentime, primaryColor),
+                          _buildPermissionsSection(context, loc, isDark, settings, primaryColor),
 
                           const SizedBox(height: 10),
 
@@ -221,11 +222,10 @@ class SettingsScreen extends StatelessWidget {
     AppLocalizations loc,
     bool isDark,
     SettingsProvider settings,
-    ScreentimeProvider screentime,
     Color primaryColor,
   ) {
     final theme = Theme.of(context);
-    final isUsageActive = settings.usagePermissionGranted || screentime.hasUsagePermission;
+    final isUsageActive = settings.usagePermissionGranted;
 
     return Container(
       padding: const EdgeInsets.all(14),
@@ -257,18 +257,15 @@ class SettingsScreen extends StatelessWidget {
             context: context,
             title: loc.get('permissionUsage'),
             subtitle: loc.get('permissionUsageDesc'),
-            isActive: isUsageActive,
+            value: isUsageActive,
             isDark: isDark,
             primaryColor: primaryColor,
-            onToggle: () {
+            onChanged: (next) async {
               HapticFeedback.lightImpact();
-              final next = !isUsageActive;
-              settings.setUsagePermission(next);
               if (next) {
-                screentime.grantUsagePermission();
-              } else {
-                screentime.toggleUsagePermission();
+                settings.requestUsagePermission();
               }
+              await settings.refreshPermissions();
             },
           ),
           const SizedBox(height: 8),
@@ -277,12 +274,12 @@ class SettingsScreen extends StatelessWidget {
             context: context,
             title: loc.get('permissionNotification'),
             subtitle: loc.get('permissionNotificationDesc'),
-            isActive: settings.notificationPermissionGranted,
+            value: settings.notificationPermissionGranted,
             isDark: isDark,
             primaryColor: primaryColor,
-            onToggle: () {
+            onChanged: (next) async {
               HapticFeedback.lightImpact();
-              settings.toggleNotificationPermission();
+              await settings.toggleNotificationPermission();
             },
           ),
           const SizedBox(height: 8),
@@ -291,12 +288,12 @@ class SettingsScreen extends StatelessWidget {
             context: context,
             title: loc.get('permissionOverlay'),
             subtitle: loc.get('permissionOverlayDesc'),
-            isActive: settings.overlayPermissionGranted,
+            value: settings.overlayPermissionGranted,
             isDark: isDark,
             primaryColor: primaryColor,
-            onToggle: () {
+            onChanged: (next) async {
               HapticFeedback.lightImpact();
-              settings.requestOverlayPermission();
+              await settings.toggleOverlayPermission();
             },
           ),
           const SizedBox(height: 8),
@@ -305,12 +302,15 @@ class SettingsScreen extends StatelessWidget {
             context: context,
             title: loc.get('permissionAccessibility'),
             subtitle: loc.get('permissionAccessibilityDesc'),
-            isActive: settings.accessibilityPermissionGranted,
+            value: settings.accessibilityPermissionGranted,
             isDark: isDark,
             primaryColor: primaryColor,
-            onToggle: () {
+            onChanged: (next) async {
               HapticFeedback.lightImpact();
-              settings.requestAccessibilityPermission();
+              if (next) {
+                settings.requestAccessibilityPermission();
+              }
+              await settings.refreshPermissions();
             },
           ),
           const SizedBox(height: 8),
@@ -319,12 +319,15 @@ class SettingsScreen extends StatelessWidget {
             context: context,
             title: loc.get('permissionBattery'),
             subtitle: loc.get('permissionBatteryDesc'),
-            isActive: settings.batteryOptimizationIgnored,
+            value: settings.batteryOptimizationIgnored,
             isDark: isDark,
             primaryColor: primaryColor,
-            onToggle: () {
+            onChanged: (next) async {
               HapticFeedback.lightImpact();
-              settings.requestBatteryOptimization();
+              if (next) {
+                settings.requestBatteryOptimization();
+              }
+              await settings.refreshPermissions();
             },
           ),
         ],
@@ -336,15 +339,15 @@ class SettingsScreen extends StatelessWidget {
     required BuildContext context,
     required String title,
     required String subtitle,
-    required bool isActive,
+    required bool value,
     required bool isDark,
     required Color primaryColor,
-    required VoidCallback onToggle,
+    required ValueChanged<bool> onChanged,
   }) {
     final theme = Theme.of(context);
 
     return InkWell(
-      onTap: onToggle,
+      onTap: () => onChanged(!value),
       borderRadius: BorderRadius.circular(12),
       child: Padding(
         padding: const EdgeInsets.symmetric(vertical: 3),
@@ -368,25 +371,12 @@ class SettingsScreen extends StatelessWidget {
                 ],
               ),
             ),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-              decoration: BoxDecoration(
-                color: isActive
-                    ? primaryColor
-                    : (isDark ? const Color(0xFF1E1E1E) : const Color(0xFFE2E4E8)),
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: Text(
-                isActive ? 'AKTIF' : 'OFF',
-                style: TextStyle(
-                  fontSize: 9,
-                  fontWeight: FontWeight.w800,
-                  letterSpacing: 0.5,
-                  color: isActive
-                      ? (isDark ? const Color(0xFF000000) : const Color(0xFFFFFFFF))
-                      : (isDark ? const Color(0xFF888888) : const Color(0xFF666666)),
-                ),
-              ),
+            EaseToggleButton(
+              value: value,
+              onChanged: onChanged,
+              activeColor: primaryColor,
+              width: 64,
+              height: 32,
             ),
           ],
         ),
