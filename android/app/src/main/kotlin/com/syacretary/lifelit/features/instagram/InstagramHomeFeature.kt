@@ -1,17 +1,17 @@
 package com.syacretary.lifelit.features.instagram
 
+import android.content.Context
 import android.view.accessibility.AccessibilityNodeInfo
 
 object InstagramHomeFeature {
 
     /**
      * Handles "Matikan Beranda" (disable_home & dm_profile_only):
-     * Strictly redirect to DM without displaying any overlay.
-     * Guaranteed to navigate directly to direct_tab (fallback Profile).
+     * Opens the DM inbox by URI, then Profile if that intent cannot be delivered.
      */
-    fun handleHomeBlocked(root: AccessibilityNodeInfo): Boolean {
-        return if (!InstagramNavigation.clickDM(root)) {
-            InstagramNavigation.clickProfile(root)
+    fun handleHomeBlocked(context: Context, root: AccessibilityNodeInfo): Boolean {
+        return if (!InstagramNavigation.goToDm(context, root)) {
+            InstagramNavigation.goToProfile(context, root)
         } else {
             true
         }

@@ -83,7 +83,7 @@ object InstagramReelsFeature {
         isNavBarReels: Boolean
     ) {
         if (isNavBarReels) {
-            InstagramNavigation.redirectToAllowedScreen(root, rules)
+            InstagramNavigation.redirectToAllowedScreen(service, root, rules)
         } else {
             service.performGlobalAction(AccessibilityService.GLOBAL_ACTION_BACK)
         }

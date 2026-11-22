@@ -1,7 +1,8 @@
 package com.syacretary.lifelit.features.tiktok
 
 import android.content.Context
-import android.graphics.Rect
+import android.content.Intent
+import android.net.Uri
 import android.view.accessibility.AccessibilityEvent
 import android.view.accessibility.AccessibilityNodeInfo
 import com.syacretary.lifelit.core.AccessibilityUtils
@@ -150,39 +151,47 @@ object TikTokNavigation {
         return false
     }
 
-    /**
-     * Navigates to TikTok Inbox tab.
-     */
-    fun clickInbox(root: AccessibilityNodeInfo): Boolean {
-        // 1. Direct ID click
-        val inboxIds = listOf("com.ss.android.ugc.trill:id/oqe", "com.zhiliaoapp.musically:id/oqe")
-        for (id in inboxIds) {
-            val nodes = root.findAccessibilityNodeInfosByViewId(id)
-            if (!nodes.isNullOrEmpty()) {
-                for (n in nodes) {
-                    if (AccessibilityUtils.clickNodeOrDescendant(n)) {
-                        recordDMAccess()
-                        return true
-                    }
-                }
-            }
-        }
+    private fun hostPackage(root: AccessibilityNodeInfo): String {
+        return root.packageName?.toString()?.takeIf { it.isNotBlank() }
+            ?: "com.ss.android.ugc.trill"
+    }
 
-        // 2. Keyword & text search
-        val inboxKeywords = listOf("Kotak Masuk", "Inbox", "Pesan", "Notifications")
-        for (kw in inboxKeywords) {
-            val node = AccessibilityUtils.findClickableNode(root, listOf(kw))
-            if (node != null && node.performAction(AccessibilityNodeInfo.ACTION_CLICK)) {
-                recordDMAccess()
-                return true
+    private fun schemeFor(packageName: String): String {
+        return if (packageName == "com.zhiliaoapp.musically") "snssdk1233" else "snssdk1180"
+    }
+
+    /**
+     * Opens a TikTok screen inside the app that is already in front.
+     * Confirmed on the installed trill build: tiktok://inbox selects Inbox,
+     * tiktok://user/homepage selects Profile.
+     */
+    private fun openUri(context: Context, packageName: String, uri: String): Boolean {
+        return try {
+            val intent = Intent(Intent.ACTION_VIEW, Uri.parse(uri)).apply {
+                setPackage(packageName)
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP)
             }
-            val textNodes = root.findAccessibilityNodeInfosByText(kw)
-            if (!textNodes.isNullOrEmpty()) {
-                for (n in textNodes) {
-                    if (AccessibilityUtils.clickNodeOrDescendant(n)) {
-                        recordDMAccess()
-                        return true
-                    }
+            context.startActivity(intent)
+            true
+        } catch (_: Exception) {
+            false
+        }
+    }
+
+    private fun openScreen(context: Context, root: AccessibilityNodeInfo, path: String): Boolean {
+        val pkg = hostPackage(root)
+        if (openUri(context, pkg, "tiktok://$path")) return true
+        return openUri(context, pkg, "${schemeFor(pkg)}://$path")
+    }
+
+    private fun clickViewId(root: AccessibilityNodeInfo, viewIds: List<String>): Boolean {
+        for (viewId in viewIds) {
+            val nodes = root.findAccessibilityNodeInfosByViewId(viewId) ?: continue
+            for (node in nodes) {
+                if (node.isClickable && node.performAction(AccessibilityNodeInfo.ACTION_CLICK)) return true
+                for (i in 0 until node.childCount) {
+                    val child = node.getChild(i) ?: continue
+                    if (child.isClickable && child.performAction(AccessibilityNodeInfo.ACTION_CLICK)) return true
                 }
             }
         }
@@ -190,33 +199,30 @@ object TikTokNavigation {
     }
 
     /**
+     * Navigates to TikTok Inbox tab.
+     */
+    fun goToInbox(context: Context, root: AccessibilityNodeInfo): Boolean {
+        if (openScreen(context, root, "inbox")) {
+            recordDMAccess()
+            return true
+        }
+        val clicked = clickViewId(
+            root,
+            listOf("com.ss.android.ugc.trill:id/oqe", "com.zhiliaoapp.musically:id/oqe")
+        )
+        if (clicked) recordDMAccess()
+        return clicked
+    }
+
+    /**
      * Navigates to TikTok Profile tab.
      */
-    fun clickProfile(root: AccessibilityNodeInfo): Boolean {
-        // 1. Direct ID click
-        val profileIds = listOf("com.ss.android.ugc.trill:id/oqf", "com.zhiliaoapp.musically:id/oqf")
-        for (id in profileIds) {
-            val nodes = root.findAccessibilityNodeInfosByViewId(id)
-            if (!nodes.isNullOrEmpty()) {
-                for (n in nodes) {
-                    if (AccessibilityUtils.clickNodeOrDescendant(n)) return true
-                }
-            }
-        }
-
-        // 2. Keyword & text search
-        val profileKeywords = listOf("Profil", "Profile", "Saya", "Me")
-        for (kw in profileKeywords) {
-            val node = AccessibilityUtils.findClickableNode(root, listOf(kw))
-            if (node != null && node.performAction(AccessibilityNodeInfo.ACTION_CLICK)) return true
-            val textNodes = root.findAccessibilityNodeInfosByText(kw)
-            if (!textNodes.isNullOrEmpty()) {
-                for (n in textNodes) {
-                    if (AccessibilityUtils.clickNodeOrDescendant(n)) return true
-                }
-            }
-        }
-        return false
+    fun goToProfile(context: Context, root: AccessibilityNodeInfo): Boolean {
+        if (openScreen(context, root, "user/homepage")) return true
+        return clickViewId(
+            root,
+            listOf("com.ss.android.ugc.trill:id/oqf", "com.zhiliaoapp.musically:id/oqf")
+        )
     }
 
     /**
@@ -252,17 +258,22 @@ object TikTokNavigation {
     }
 
     /**
-     * Switches from FYP to "Mengikuti" / "Following" tab.
+     * Switches from FYP to the Following chip. No registered URI selects that chip
+     * on the installed build, so this clicks the chip itself and never a parent post.
      */
-    fun clickFollowingTab(root: AccessibilityNodeInfo): Boolean {
-        val followingKeywords = listOf("Mengikuti", "Following", "Teman", "Friends")
-        for (kw in followingKeywords) {
-            val node = AccessibilityUtils.findClickableNode(root, listOf(kw))
-            if (node != null && node.performAction(AccessibilityNodeInfo.ACTION_CLICK)) return true
-            val textNodes = root.findAccessibilityNodeInfosByText(kw)
-            if (!textNodes.isNullOrEmpty()) {
-                for (n in textNodes) {
-                    if (AccessibilityUtils.clickNodeOrDescendant(n)) return true
+    fun goToFollowing(root: AccessibilityNodeInfo): Boolean {
+        val labels = listOf("Mengikuti", "Following")
+        for (label in labels) {
+            val nodes = root.findAccessibilityNodeInfosByText(label) ?: continue
+            for (node in nodes) {
+                val own = (node.text?.toString() ?: "") + (node.contentDescription?.toString() ?: "")
+                if (!own.contains(label, ignoreCase = true)) continue
+                if (node.isClickable && node.performAction(AccessibilityNodeInfo.ACTION_CLICK)) return true
+                val parent = node.parent ?: continue
+                val parentLabel = (parent.text?.toString() ?: "") + (parent.contentDescription?.toString() ?: "")
+                if (parent.isClickable && parentLabel.contains(label, ignoreCase = true) &&
+                    parent.performAction(AccessibilityNodeInfo.ACTION_CLICK)) {
+                    return true
                 }
             }
         }

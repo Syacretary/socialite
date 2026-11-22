@@ -3,17 +3,20 @@ package com.syacretary.lifelit
 import android.accessibilityservice.AccessibilityService
 import android.app.usage.UsageStatsManager
 import android.content.Context
+import android.content.Intent
 import android.os.Handler
 import android.os.Looper
 import android.view.accessibility.AccessibilityEvent
-import com.syacretary.lifelit.core.AccessibilityUtils
 import com.syacretary.lifelit.core.AppFeatureHandler
 import com.syacretary.lifelit.features.instagram.InstagramHandler
 import com.syacretary.lifelit.features.tiktok.TikTokHandler
 import com.syacretary.lifelit.features.twitter.TwitterHandler
 import com.syacretary.lifelit.features.youtube.YouTubeHandler
 import org.json.JSONObject
+import java.text.SimpleDateFormat
 import java.util.Calendar
+import java.util.Date
+import java.util.Locale
 
 data class NativeAppLimit(
     val appId: String,
@@ -37,8 +40,33 @@ class LifelitAccessibilityService : AccessibilityService() {
 
     private var pendingHideRunnable: Runnable? = null
     private var pendingEvalRunnable: Runnable? = null
+    private var limitCheckRunnable: Runnable? = null
 
     private lateinit var featureHandlers: List<AppFeatureHandler>
+    private var prefsLoaded = false
+
+    // ── Real-time usage tracking for time-limit enforcement ──────────────
+    // UsageStatsManager only commits foreground time when an app is paused,
+    // so a continuously scrolling user could pass the limit without any
+    // native intervention. We track the live foreground session ourselves
+    // and use the higher of (tracked, UsageStats) as the effective usage.
+    private val usagePrefs by lazy {
+        getSharedPreferences("lifelit_usage_tracking", Context.MODE_PRIVATE)
+    }
+    private val trackedUsageMs = mutableMapOf<String, Long>()
+    private var trackedUsageDate: String = ""
+    private var foregroundPkg: String? = null
+    private var foregroundSince: Long = 0L
+    private var foregroundBaselineMs: Long = 0L
+
+    // UsageStats queries are relatively expensive; cache them briefly.
+    private var lastSystemUsageCheckAt = 0L
+    private var lastSystemUsagePkg = ""
+    private var lastSystemUsageMs = 0L
+
+    // Throttle repeated reminder banners/popups so they don't fire on every
+    // accessibility event while the user is still inside the same app.
+    private val lastInterventionAt = mutableMapOf<String, Long>()
 
     companion object {
         var instance: LifelitAccessibilityService? = null
@@ -48,6 +76,13 @@ class LifelitAccessibilityService : AccessibilityService() {
         private const val KEY_RULES  = "active_feature_rules"
         private const val PREFS_CONFIG = "lifelit_app_config"
         private const val KEY_CONFIG = "app_configurations"
+
+        // Minimum gap between two non-blocking interventions for the same app.
+        private const val INTERVENTION_COOLDOWN_MS = 60_000L
+
+        // Periodically re-check the limit while a restricted app is foreground,
+        // even if the app emits no accessibility events (e.g. long video).
+        private const val LIMIT_CHECK_INTERVAL_MS = 15_000L
 
         private val activeRules = mutableMapOf<String, MutableSet<String>>()
         private val activeLimits = mutableMapOf<String, NativeAppLimit>()
@@ -154,8 +189,7 @@ class LifelitAccessibilityService : AccessibilityService() {
         super.onServiceConnected()
         instance = this
         ensureInitialized()
-        loadRulesFromPrefs(this)
-        loadLimitsFromPrefs(this)
+        loadTrackedUsage()
     }
 
     private fun ensureInitialized() {
@@ -170,16 +204,19 @@ class LifelitAccessibilityService : AccessibilityService() {
                 TwitterHandler()
             )
         }
-        if (activeRules.isEmpty() || activeLimits.isEmpty()) {
+        if (!prefsLoaded) {
             loadRulesFromPrefs(this)
             loadLimitsFromPrefs(this)
+            prefsLoaded = true
         }
     }
 
     override fun onDestroy() {
         cancelPendingHide()
         cancelPendingEval()
-        overlayManager?.hideFeedBlockOverlay()
+        stopLimitCheckLoop()
+        finalizeForegroundSession()
+        overlayManager?.hideAllOverlays()
         overlayManager = null
         instance = null
         super.onDestroy()
@@ -188,22 +225,35 @@ class LifelitAccessibilityService : AccessibilityService() {
     override fun onInterrupt() {
         cancelPendingHide()
         cancelPendingEval()
-        overlayManager?.hideFeedBlockOverlay()
+        stopLimitCheckLoop()
+        finalizeForegroundSession()
+        overlayManager?.hideAllOverlays()
     }
 
     override fun onAccessibilityEvent(event: AccessibilityEvent?) {
         if (event == null) return
         val pkg = event.packageName?.toString() ?: return
 
-        // 1. Ignore our own overlay window
-        if (pkg.contains("com.syacretary.lifelit")) return
+        // 1. Our own windows. Ignore overlay events, but if the real Lifelit
+        //    activity comes to the foreground (e.g. the blocker's "Kembali ke
+        //    Lifelit" button), make sure no intervention window is left on top.
+        if (pkg.contains("com.syacretary.lifelit")) {
+            val className = event.className?.toString() ?: ""
+            if (className.contains("MainActivity") || className.contains("FlutterActivity")) {
+                updateForeground(null)
+                overlayManager?.hideAllOverlays()
+            }
+            return
+        }
 
         ensureInitialized()
 
         val handler = findHandlerForPackage(pkg)
+        val limitConfig = findLimitForPackage(pkg)
 
-        // 2. If it is NOT a managed app, handle transient system overlays and window transitions
-        if (handler == null) {
+        // 2. If this is neither a managed feature app nor an app with an active
+        //    time limit, handle transient system overlays and window transitions.
+        if (handler == null && limitConfig == null) {
             val isTransient = isTransientPackage(pkg)
             if (isTransient) {
                 // Transient system overlay (smart edge, notification, keyboard) -> Do not dismiss current overlay
@@ -212,27 +262,27 @@ class LifelitAccessibilityService : AccessibilityService() {
 
             // Genuinely exiting to another user app (e.g. Launcher, Settings, WhatsApp) -> Hide overlay
             if (event.eventType == AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED) {
-                hideOverlayImmediate()
+                updateForeground(null)
+                hideAllOverlaysImmediate()
             }
             return
         }
 
+        // The user is actively inside a managed/limited app. Keep the live usage
+        // clock running so limits are enforced without waiting for UsageStats commit.
+        updateForeground(pkg)
+
         // 3. Native Screen Time Limit Enforcement (runs completely standalone in background)
-        val limitConfig = activeLimits[pkg]
-        if (limitConfig != null && limitConfig.isRestricted && limitConfig.dailyLimitMinutes > 0) {
-            if (isTimeLimitExceeded(pkg, limitConfig.dailyLimitMinutes)) {
-                if (limitConfig.actionOnLimit == 2) { // blockAndClose
-                    AccessibilityUtils.navigateToHome(this, this, pkg)
-                    overlayManager?.showFeedBlockOverlay(
-                        appName = limitConfig.appId.replaceFirstChar { it.uppercase() },
-                        title = "Batas Waktu Tercapai",
-                        subtitle = "Batas harian ${limitConfig.dailyLimitMinutes} menit telah habis untuk hari ini.",
-                        isDark = true
-                    )
-                    return
-                }
-            }
+        if (limitConfig != null && limitConfig.isRestricted && limitConfig.dailyLimitMinutes > 0 &&
+            isTimeLimitExceeded(pkg, limitConfig.dailyLimitMinutes)
+        ) {
+            val blocked = enforceTimeLimit(pkg, limitConfig)
+            if (blocked) return
         }
+
+        // Apps without a feature handler (Reddit, Facebook, etc.) only need the
+        // time-limit enforcement above; there is no feature evaluation to run.
+        if (handler == null) return
 
         // 4. Fast redirect check for Shorts / Reels / Stories / Home
         val root = rootInActiveWindow
@@ -251,28 +301,300 @@ class LifelitAccessibilityService : AccessibilityService() {
         scheduleEvaluation(100L)
     }
 
-    private fun isTimeLimitExceeded(pkg: String, limitMinutes: Int): Boolean {
+    /**
+     * Applies the configured action when [pkg] has exceeded its daily limit.
+     *
+     * @return true when a full-screen blocker owns the screen and feature
+     *         evaluation should be skipped.
+     */
+    private fun enforceTimeLimit(pkg: String, limit: NativeAppLimit): Boolean {
+        val om = overlayManager ?: return false
+
+        val appLabel = try {
+            val pm = packageManager
+            pm.getApplicationLabel(pm.getApplicationInfo(pkg, 0)).toString()
+        } catch (e: Exception) {
+            limit.appId.replaceFirstChar { it.uppercase() }
+        }
+
+        val limitLabel = formatLimit(limit.dailyLimitMinutes)
+
+        return when (limit.actionOnLimit) {
+            0 -> { // notifyOnly
+                if (canShowIntervention(pkg)) {
+                    om.showLimitIntervention(
+                        appName = appLabel,
+                        packageName = pkg,
+                        title = "$appLabel — Batas Tercapai",
+                        message = "Kamu telah menggunakan $limitLabel hari ini.",
+                        mode = LimitInterventionMode.NOTIFY
+                    )
+                }
+                false
+            }
+            1 -> { // popupReminder
+                if (canShowIntervention(pkg)) {
+                    om.showLimitIntervention(
+                        appName = appLabel,
+                        packageName = pkg,
+                        title = "Waktumu untuk $appLabel sudah habis",
+                        message = "Kamu telah menggunakan $limitLabel hari ini.\nIstirahatlah sejenak dan kembali besok.",
+                        mode = LimitInterventionMode.POPUP
+                    )
+                }
+                false
+            }
+            else -> { // blockAndClose
+                cancelPendingEval()
+                cancelPendingHide()
+                val shown = om.showLimitIntervention(
+                    appName = appLabel,
+                    packageName = pkg,
+                    title = "$appLabel Diblokir",
+                    message = "Batas harian $limitLabel telah tercapai.\nAkses dikunci hingga hari berikutnya.",
+                    mode = LimitInterventionMode.BLOCK,
+                    onOpenLifelit = { openLifelitApp() }
+                )
+                if (!shown) {
+                    // Last-resort fallback if the overlay window cannot be
+                    // attached (e.g. OEM blocks accessibility overlays).
+                    performGlobalAction(GLOBAL_ACTION_HOME)
+                }
+                true
+            }
+        }
+    }
+
+    private fun canShowIntervention(pkg: String): Boolean {
+        val now = System.currentTimeMillis()
+        val last = lastInterventionAt[pkg] ?: 0L
+        if (now - last < INTERVENTION_COOLDOWN_MS) return false
+        lastInterventionAt[pkg] = now
+        return true
+    }
+
+    private fun formatLimit(minutes: Int): String {
+        val hours = minutes / 60
+        val mins = minutes % 60
+        return when {
+            hours > 0 && mins > 0 -> "$hours jam $mins menit"
+            hours > 0 -> "$hours jam"
+            else -> "$mins menit"
+        }
+    }
+
+    private fun openLifelitApp() {
         try {
-            val usm = getSystemService(Context.USAGE_STATS_SERVICE) as? UsageStatsManager ?: return false
+            val intent = Intent(this, MainActivity::class.java).apply {
+                addFlags(
+                    Intent.FLAG_ACTIVITY_NEW_TASK or
+                    Intent.FLAG_ACTIVITY_CLEAR_TOP or
+                    Intent.FLAG_ACTIVITY_SINGLE_TOP
+                )
+            }
+            startActivity(intent)
+        } catch (e: Exception) {
+            performGlobalAction(GLOBAL_ACTION_HOME)
+        }
+    }
+
+    // ══════════════════════════════════════════════════════════════════════
+    // Real-time usage tracking
+    // ══════════════════════════════════════════════════════════════════════
+
+    private fun todayKey(): String =
+        SimpleDateFormat("yyyy-MM-dd", Locale.US).format(Date())
+
+    private fun ensureUsageDay() {
+        val today = todayKey()
+        if (trackedUsageDate != today) {
+            trackedUsageDate = today
+            trackedUsageMs.clear()
+            lastInterventionAt.clear()
+            usagePrefs.edit().clear().putString("date", today).apply()
+
+            // If a session was already running across midnight, restart its
+            // baseline so yesterday's time is not counted for today.
+            if (foregroundPkg != null) {
+                foregroundSince = System.currentTimeMillis()
+                foregroundBaselineMs = 0L
+            }
+        }
+    }
+
+    private fun loadTrackedUsage() {
+        trackedUsageDate = usagePrefs.getString("date", "") ?: ""
+        val today = todayKey()
+        if (trackedUsageDate != today) {
+            trackedUsageDate = today
+            trackedUsageMs.clear()
+            usagePrefs.edit().clear().putString("date", today).apply()
+            return
+        }
+
+        trackedUsageMs.clear()
+        val raw = usagePrefs.getString("usage", "") ?: ""
+        raw.split(";").forEach { entry ->
+            val idx = entry.lastIndexOf(':')
+            if (idx > 0) {
+                val packageName = entry.substring(0, idx)
+                val value = entry.substring(idx + 1).toLongOrNull() ?: 0L
+                if (packageName.isNotBlank()) trackedUsageMs[packageName] = value
+            }
+        }
+    }
+
+    private fun persistTrackedUsage() {
+        val raw = trackedUsageMs.entries.joinToString(";") { "${it.key}:${it.value}" }
+        usagePrefs.edit()
+            .putString("date", trackedUsageDate)
+            .putString("usage", raw)
+            .apply()
+    }
+
+    /**
+     * Keeps a live foreground clock per package. When the foreground package
+     * changes, the elapsed session is committed to today's tracked total.
+     */
+    private fun updateForeground(pkg: String?) {
+        ensureUsageDay()
+        val now = System.currentTimeMillis()
+        val previous = foregroundPkg
+
+        if (previous == pkg) {
+            if (pkg != null && foregroundSince <= 0L) {
+                foregroundSince = now
+                foregroundBaselineMs = maxOf(trackedUsageMs[pkg] ?: 0L, systemUsageFor(pkg))
+                startLimitCheckLoop()
+            }
+            return
+        }
+
+        if (previous != null) {
+            val elapsed = now - foregroundSince
+            if (elapsed > 0) {
+                // Keep the higher of the previously tracked value and the
+                // system baseline so usage from before the service started is
+                // never lost.
+                trackedUsageMs[previous] = maxOf(
+                    trackedUsageMs[previous] ?: 0L,
+                    foregroundBaselineMs
+                ) + elapsed
+                persistTrackedUsage()
+            }
+
+            // An intervention belongs to the previous app. Hide it before the
+            // new app (e.g. Instagram -> TikTok) gets its own enforcement.
+            overlayManager?.hideAllOverlays()
+        }
+
+        foregroundPkg = pkg
+        if (pkg != null) {
+            foregroundSince = now
+            foregroundBaselineMs = maxOf(trackedUsageMs[pkg] ?: 0L, systemUsageFor(pkg))
+            startLimitCheckLoop()
+        } else {
+            foregroundSince = 0L
+            foregroundBaselineMs = 0L
+            stopLimitCheckLoop()
+        }
+    }
+
+    private fun finalizeForegroundSession() {
+        updateForeground(null)
+    }
+
+    private fun startLimitCheckLoop() {
+        if (limitCheckRunnable != null) return
+
+        val runnable = object : Runnable {
+            override fun run() {
+                val pkg = foregroundPkg
+                if (pkg != null) {
+                    val limit = findLimitForPackage(pkg)
+                    if (limit != null && limit.isRestricted && limit.dailyLimitMinutes > 0 &&
+                        isTimeLimitExceeded(pkg, limit.dailyLimitMinutes)
+                    ) {
+                        enforceTimeLimit(pkg, limit)
+                    }
+                }
+                handler.postDelayed(this, LIMIT_CHECK_INTERVAL_MS)
+            }
+        }
+
+        limitCheckRunnable = runnable
+        handler.postDelayed(runnable, LIMIT_CHECK_INTERVAL_MS)
+    }
+
+    private fun stopLimitCheckLoop() {
+        limitCheckRunnable?.let {
+            handler.removeCallbacks(it)
+            limitCheckRunnable = null
+        }
+    }
+
+    private fun trackedUsageFor(pkg: String): Long {
+        ensureUsageDay()
+        return if (foregroundPkg == pkg && foregroundSince > 0L) {
+            foregroundBaselineMs + (System.currentTimeMillis() - foregroundSince)
+        } else {
+            trackedUsageMs[pkg] ?: 0L
+        }
+    }
+
+    private fun systemUsageFor(pkg: String): Long {
+        val now = System.currentTimeMillis()
+        if (pkg == lastSystemUsagePkg && now - lastSystemUsageCheckAt < 15_000L) {
+            return lastSystemUsageMs
+        }
+
+        val result = try {
+            val usm = getSystemService(Context.USAGE_STATS_SERVICE) as? UsageStatsManager ?: return 0L
             val cal = Calendar.getInstance().apply {
                 set(Calendar.HOUR_OF_DAY, 0)
                 set(Calendar.MINUTE, 0)
                 set(Calendar.SECOND, 0)
                 set(Calendar.MILLISECOND, 0)
             }
-            val stats = usm.queryUsageStats(UsageStatsManager.INTERVAL_DAILY, cal.timeInMillis, System.currentTimeMillis())
-            val appStat = stats?.firstOrNull { it.packageName == pkg } ?: return false
-            val usedMinutes = appStat.totalTimeInForeground / (1000 * 60)
-            return usedMinutes >= limitMinutes
+            val stats = usm.queryAndAggregateUsageStats(
+                cal.timeInMillis,
+                now
+            ) ?: return 0L
+            stats[pkg]?.totalTimeInForeground ?: 0L
         } catch (e: Exception) {
-            return false
+            0L
         }
+
+        lastSystemUsagePkg = pkg
+        lastSystemUsageCheckAt = now
+        lastSystemUsageMs = result
+        return result
+    }
+
+    private fun isTimeLimitExceeded(pkg: String, limitMinutes: Int): Boolean {
+        val thresholdMs = limitMinutes * 60_000L
+        val tracked = trackedUsageFor(pkg)
+        val system = systemUsageFor(pkg)
+        return maxOf(tracked, system) >= thresholdMs
     }
 
     private fun findHandlerForPackage(pkg: String): AppFeatureHandler? {
         if (!::featureHandlers.isInitialized) return null
         return featureHandlers.firstOrNull { h ->
             h.supportedPackages.any { pkg.contains(it) || it.contains(pkg) }
+        }
+    }
+
+    /**
+     * Resolves the configured limit even when the event package differs from
+     * the stored package (e.g. TikTok global vs SEA package aliases).
+     */
+    private fun findLimitForPackage(pkg: String): NativeAppLimit? {
+        activeLimits[pkg]?.let { return it }
+        return activeLimits.values.firstOrNull { limit ->
+            pkg.contains(limit.packageName, ignoreCase = true) ||
+                limit.packageName.contains(pkg, ignoreCase = true) ||
+                (limit.appId == "tiktok" && (pkg.contains("musically") || pkg.contains("trill")))
         }
     }
 
@@ -326,7 +648,18 @@ class LifelitAccessibilityService : AccessibilityService() {
         overlayManager?.hideFeedBlockOverlay()
     }
 
+    /** Hides the feed mask and any time-limit intervention window. */
+    private fun hideAllOverlaysImmediate() {
+        cancelPendingHide()
+        cancelPendingEval()
+        overlayManager?.hideAllOverlays()
+    }
+
     private fun evaluateCurrentState() {
+        // A blocking limit window owns the screen; don't let feature handlers
+        // replace it with a feed mask or hide it.
+        if (overlayManager?.isBlockingInterventionShowing == true) return
+
         val root = getActiveManagedRoot() ?: return
         val activePkg = root.packageName?.toString() ?: return
         val handler = findHandlerForPackage(activePkg) ?: run {

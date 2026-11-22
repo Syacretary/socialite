@@ -1,13 +1,12 @@
 package com.syacretary.lifelit.features.youtube
 
 import android.accessibilityservice.AccessibilityService
+import android.content.Intent
 import android.graphics.Rect
-import android.os.Handler
-import android.os.Looper
+import android.net.Uri
 import android.view.accessibility.AccessibilityEvent
 import android.view.accessibility.AccessibilityNodeInfo
 import com.syacretary.lifelit.LifelitOverlayManager
-import com.syacretary.lifelit.core.AccessibilityUtils
 import com.syacretary.lifelit.core.AppFeatureHandler
 import com.syacretary.lifelit.core.FeedBounds
 
@@ -16,8 +15,7 @@ class YouTubeHandler : AppFeatureHandler {
     override val supportedPackages: Set<String> = setOf("com.google.android.youtube")
 
     private var lastNavTimestamp = 0L
-    private val NAV_COOLDOWN_MS = 1200L
-    private val handler = Handler(Looper.getMainLooper())
+    private val NAV_COOLDOWN_MS = 1400L
 
     override fun onFastRedirect(
         service: AccessibilityService,
@@ -114,39 +112,46 @@ class YouTubeHandler : AppFeatureHandler {
         return cls.contains("ReelWatchFragment", ignoreCase = true) || cls.contains("ShortsPlayer", ignoreCase = true)
     }
 
+    /**
+     * Opens the Home tab by the https host YouTube registers for its main feed.
+     * Confirmed on-device: this selects the Home pivot and does not press Back.
+     */
     private fun redirectToHome(service: AccessibilityService, root: AccessibilityNodeInfo?) {
-        service.performGlobalAction(AccessibilityService.GLOBAL_ACTION_BACK)
-        if (root != null) {
-            clickHomeTab(root)
-        }
-        handler.postDelayed({
-            val newRoot = service.rootInActiveWindow
-            if (newRoot != null) {
-                clickHomeTab(newRoot)
+        if (openYouTubeHome(service)) return
+        if (root != null) clickHomeTab(root)
+    }
+
+    private fun openYouTubeHome(service: AccessibilityService): Boolean {
+        return try {
+            val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://www.youtube.com/")).apply {
+                setPackage("com.google.android.youtube")
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP)
             }
-        }, 180L)
+            service.startActivity(intent)
+            true
+        } catch (_: Exception) {
+            false
+        }
     }
 
     private fun clickHomeTab(root: AccessibilityNodeInfo): Boolean {
         val pivotNodes = root.findAccessibilityNodeInfosByViewId("com.google.android.youtube:id/pivot_bar")
-        if (!pivotNodes.isNullOrEmpty()) {
-            val pivot = pivotNodes[0]
-            for (i in 0 until pivot.childCount) {
-                val child = pivot.getChild(i) ?: continue
-                val desc = child.contentDescription?.toString() ?: ""
-                val text = child.text?.toString() ?: ""
-                if (desc.contains("Beranda", ignoreCase = true) || desc.contains("Home", ignoreCase = true) ||
-                    text.contains("Beranda", ignoreCase = true) || text.contains("Home", ignoreCase = true)) {
-                    if (AccessibilityUtils.clickNodeOrDescendant(child)) return true
-                }
-            }
-        }
-
-        for (label in listOf("Beranda", "Home")) {
-            val nodes = root.findAccessibilityNodeInfosByText(label)
-            if (!nodes.isNullOrEmpty()) {
-                for (node in nodes) {
-                    if (AccessibilityUtils.clickNodeOrDescendant(node)) return true
+            ?: return false
+        val pivot = pivotNodes.firstOrNull() ?: return false
+        for (i in 0 until pivot.childCount) {
+            val child = pivot.getChild(i) ?: continue
+            val desc = child.contentDescription?.toString() ?: ""
+            val text = child.text?.toString() ?: ""
+            val isHome = desc.contains("Beranda", ignoreCase = true) ||
+                desc.contains("Home", ignoreCase = true) ||
+                text.contains("Beranda", ignoreCase = true) ||
+                text.contains("Home", ignoreCase = true)
+            if (!isHome) continue
+            if (child.isClickable && child.performAction(AccessibilityNodeInfo.ACTION_CLICK)) return true
+            for (j in 0 until child.childCount) {
+                val grandchild = child.getChild(j) ?: continue
+                if (grandchild.isClickable && grandchild.performAction(AccessibilityNodeInfo.ACTION_CLICK)) {
+                    return true
                 }
             }
         }

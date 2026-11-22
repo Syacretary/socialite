@@ -16,7 +16,7 @@ class InstagramHandler : AppFeatureHandler {
     override val supportedPackages: Set<String> = setOf("com.instagram.android")
 
     private var lastNavTimestamp = 0L
-    private val NAV_COOLDOWN_MS = 600L
+    private val NAV_COOLDOWN_MS = 1400L
 
     override fun onFastRedirect(
         service: AccessibilityService,
@@ -60,7 +60,7 @@ class InstagramHandler : AppFeatureHandler {
             val activeTab = InstagramNavigation.getActiveTab(root)
             if (activeTab == InstagramTab.HOME) {
                 lastNavTimestamp = now
-                val clicked = InstagramHomeFeature.handleHomeBlocked(root)
+                val clicked = InstagramHomeFeature.handleHomeBlocked(service, root)
                 if (clicked) return true
             }
         }
@@ -99,7 +99,7 @@ class InstagramHandler : AppFeatureHandler {
                 val now = System.currentTimeMillis()
                 if (now - lastNavTimestamp > NAV_COOLDOWN_MS) {
                     lastNavTimestamp = now
-                    InstagramHomeFeature.handleHomeBlocked(root)
+                    InstagramHomeFeature.handleHomeBlocked(service, root)
                 }
                 hideImmediate()
                 return
@@ -126,7 +126,7 @@ class InstagramHandler : AppFeatureHandler {
                 val now = System.currentTimeMillis()
                 if (now - lastNavTimestamp > NAV_COOLDOWN_MS) {
                     lastNavTimestamp = now
-                    InstagramNavigation.redirectToAllowedScreen(root, rules)
+                    InstagramNavigation.redirectToAllowedScreen(service, root, rules)
                 }
             }
             scheduleHide(150L)
@@ -142,7 +142,7 @@ class InstagramHandler : AppFeatureHandler {
                     val now = System.currentTimeMillis()
                     if (now - lastNavTimestamp > NAV_COOLDOWN_MS) {
                         lastNavTimestamp = now
-                        InstagramHomeFeature.handleHomeBlocked(root)
+                        InstagramHomeFeature.handleHomeBlocked(service, root)
                     }
                 }
             }

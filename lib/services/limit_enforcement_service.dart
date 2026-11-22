@@ -2,11 +2,16 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import '../models/app_item.dart';
 import '../providers/app_management_provider.dart';
+import 'feature_block_service.dart';
 
-/// Simulates real-time usage tracking and enforces daily time limits.
-/// In production this would hook into platform UsageStatsManager / AAAS.
-/// For the demo, we tick every minute, increment usageMinutesToday for
-/// restricted apps, and fire the configured action when the limit is reached.
+/// Simulates usage tracking for the demo UI and provides an in-app fallback
+/// when the native Accessibility Service is not enabled.
+///
+/// Real time-limit enforcement — including the external intervention window
+/// that appears on top of Instagram/TikTok/etc. — is handled natively by
+/// `LifelitAccessibilityService` using UsageStatsManager + a live session
+/// clock. This service only shows an in-app dialog if that native enforcement
+/// is unavailable.
 class LimitEnforcementService {
   LimitEnforcementService._();
   static final LimitEnforcementService instance = LimitEnforcementService._();
@@ -46,9 +51,19 @@ class LimitEnforcementService {
     }
   }
 
-  void _fireAction(AppItem app, BuildContext context) {
+  Future<void> _fireAction(AppItem app, BuildContext context) async {
     if (!context.mounted) return;
 
+    // When the accessibility service is active it renders the real
+    // intervention window on top of the social app (Instagram, TikTok, etc.).
+    // Do not duplicate it as an in-app dialog that would only be visible
+    // while Lifelit itself is open.
+    final nativeEnforcementActive =
+        await FeatureBlockService.isAccessibilityGranted();
+    if (nativeEnforcementActive || !context.mounted) return;
+
+    // Fallback for devices where the accessibility service is not enabled:
+    // show the intervention inside Lifelit so the user still gets feedback.
     switch (app.actionOnLimit) {
       case LimitAction.notifyOnly:
         _showSnackbar(context, app);

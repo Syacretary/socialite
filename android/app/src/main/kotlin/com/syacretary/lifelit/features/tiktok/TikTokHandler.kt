@@ -4,7 +4,6 @@ import android.accessibilityservice.AccessibilityService
 import android.view.accessibility.AccessibilityEvent
 import android.view.accessibility.AccessibilityNodeInfo
 import com.syacretary.lifelit.LifelitOverlayManager
-import com.syacretary.lifelit.core.AccessibilityUtils
 import com.syacretary.lifelit.core.AppFeatureHandler
 
 /**
@@ -21,7 +20,7 @@ class TikTokHandler : AppFeatureHandler {
     )
 
     private var lastNavTimestamp = 0L
-    private val NAV_COOLDOWN_MS = 600L
+    private val NAV_COOLDOWN_MS = 1400L
 
     override fun onFastRedirect(
         service: AccessibilityService,
@@ -48,8 +47,8 @@ class TikTokHandler : AppFeatureHandler {
             val activeTab = TikTokNavigation.getActiveTab(root)
             if (activeTab != TikTokTab.INBOX && activeTab != TikTokTab.PROFILE) {
                 lastNavTimestamp = now
-                val redirected = if (!TikTokNavigation.clickInbox(root)) {
-                    TikTokNavigation.clickProfile(root)
+                val redirected = if (!TikTokNavigation.goToInbox(service, root)) {
+                    TikTokNavigation.goToProfile(service, root)
                 } else {
                     true
                 }
@@ -61,7 +60,7 @@ class TikTokHandler : AppFeatureHandler {
         if (fypBlocked && !dmOnly) {
             if (TikTokNavigation.isForYouTabSelected(root)) {
                 lastNavTimestamp = now
-                val switched = TikTokNavigation.clickFollowingTab(root)
+                val switched = TikTokNavigation.goToFollowing(root)
                 if (switched) return true
             }
         }
@@ -99,8 +98,8 @@ class TikTokHandler : AppFeatureHandler {
             val now = System.currentTimeMillis()
             if (now - lastNavTimestamp > NAV_COOLDOWN_MS) {
                 lastNavTimestamp = now
-                if (!TikTokNavigation.clickInbox(root)) {
-                    TikTokNavigation.clickProfile(root)
+                if (!TikTokNavigation.goToInbox(service, root)) {
+                    TikTokNavigation.goToProfile(service, root)
                 }
             }
             hideImmediate()
@@ -126,7 +125,7 @@ class TikTokHandler : AppFeatureHandler {
                 val now = System.currentTimeMillis()
                 if (now - lastNavTimestamp > NAV_COOLDOWN_MS) {
                     lastNavTimestamp = now
-                    TikTokNavigation.clickFollowingTab(root)
+                    TikTokNavigation.goToFollowing(root)
                 }
                 scheduleHide(200L)
                 return

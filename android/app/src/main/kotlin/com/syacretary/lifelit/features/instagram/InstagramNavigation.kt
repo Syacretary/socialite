@@ -1,7 +1,8 @@
 package com.syacretary.lifelit.features.instagram
 
 import android.content.Context
-import android.graphics.Rect
+import android.content.Intent
+import android.net.Uri
 import android.view.accessibility.AccessibilityNodeInfo
 import com.syacretary.lifelit.core.AccessibilityUtils
 
@@ -101,6 +102,7 @@ object InstagramNavigation {
             "com.instagram.android:id/direct_v2_message_thread_view",
             "com.instagram.android:id/direct_search_box",
             "com.instagram.android:id/direct_header_action_bar",
+            "com.instagram.android:id/direct_inbox_action_bar",
             "com.instagram.android:id/message_composer_container"
         )
         for (id in ids) {
@@ -160,163 +162,73 @@ object InstagramNavigation {
         return false
     }
 
-    fun clickDM(root: AccessibilityNodeInfo): Boolean {
-        // 1. Direct tab by ID in bottom navbar
-        val directTabNodes = root.findAccessibilityNodeInfosByViewId("com.instagram.android:id/direct_tab")
-        if (!directTabNodes.isNullOrEmpty()) {
-            for (n in directTabNodes) {
-                if (AccessibilityUtils.clickNodeOrDescendant(n)) return true
+    /**
+     * Opens a registered Instagram screen by URI host.
+     * Confirmed on-device: direct-inbox, mainfeed, profile each select the matching tab
+     * without touching feed content.
+     */
+    fun openScreen(context: Context, host: String): Boolean {
+        return try {
+            val intent = Intent(Intent.ACTION_VIEW, Uri.parse("instagram://$host")).apply {
+                setPackage("com.instagram.android")
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP)
             }
+            context.startActivity(intent)
+            true
+        } catch (_: Exception) {
+            false
         }
+    }
 
-        // 2. Child in tab_bar
-        val tabBars = root.findAccessibilityNodeInfosByViewId("com.instagram.android:id/tab_bar")
-        if (!tabBars.isNullOrEmpty()) {
-            val tabBar = tabBars[0]
-            for (i in 0 until tabBar.childCount) {
-                val child = tabBar.getChild(i) ?: continue
-                val resId = child.viewIdResourceName ?: ""
-                if (resId.contains("direct_tab")) {
-                    if (AccessibilityUtils.clickNodeOrDescendant(child)) return true
-                }
-            }
-            if (tabBar.childCount >= 3) {
-                val dmTab = tabBar.getChild(2)
-                if (AccessibilityUtils.clickNodeOrDescendant(dmTab)) return true
-            }
-        }
-
-        // 3. Action bar inbox button
-        val dmIds = listOf(
-            "com.instagram.android:id/action_bar_inbox_button",
-            "com.instagram.android:id/action_bar_inbox_icon",
-            "com.instagram.android:id/inbox_button"
-        )
-        for (id in dmIds) {
-            val nodes = root.findAccessibilityNodeInfosByViewId(id)
-            if (!nodes.isNullOrEmpty()) {
-                for (n in nodes) {
-                    if (AccessibilityUtils.clickNodeOrDescendant(n)) return true
-                }
-            }
-        }
-
-        // 4. Text labels
-        val dmLabels = listOf("Pesan", "Direct", "Messenger", "Inbox", "Chats")
-        for (label in dmLabels) {
-            val nodes = root.findAccessibilityNodeInfosByText(label)
-            if (!nodes.isNullOrEmpty()) {
-                for (n in nodes) {
-                    if (AccessibilityUtils.clickNodeOrDescendant(n)) return true
-                }
+    /**
+     * Clicks only the node that owns this view id, or a direct clickable child.
+     * Does not walk parents or match visible text, so a caption like "Pesan" cannot open a post.
+     */
+    private fun clickViewId(root: AccessibilityNodeInfo, viewId: String): Boolean {
+        val nodes = root.findAccessibilityNodeInfosByViewId(viewId) ?: return false
+        for (node in nodes) {
+            if (node.isClickable && node.performAction(AccessibilityNodeInfo.ACTION_CLICK)) return true
+            for (i in 0 until node.childCount) {
+                val child = node.getChild(i) ?: continue
+                if (child.isClickable && child.performAction(AccessibilityNodeInfo.ACTION_CLICK)) return true
             }
         }
         return false
     }
 
-    fun clickProfile(root: AccessibilityNodeInfo): Boolean {
-        // 1. profile_tab by ID
-        val profileNodes = root.findAccessibilityNodeInfosByViewId("com.instagram.android:id/profile_tab")
-        if (!profileNodes.isNullOrEmpty()) {
-            for (n in profileNodes) {
-                if (AccessibilityUtils.clickNodeOrDescendant(n)) return true
-            }
+    fun goToDm(context: Context, root: AccessibilityNodeInfo): Boolean {
+        if (openScreen(context, "direct-inbox")) {
+            recordDMAccess()
+            return true
         }
-
-        // 2. tab_bar child
-        val tabBars = root.findAccessibilityNodeInfosByViewId("com.instagram.android:id/tab_bar")
-        if (!tabBars.isNullOrEmpty()) {
-            val tabBar = tabBars[0]
-            for (i in 0 until tabBar.childCount) {
-                val child = tabBar.getChild(i) ?: continue
-                val resId = child.viewIdResourceName ?: ""
-                if (resId.contains("profile_tab")) {
-                    if (AccessibilityUtils.clickNodeOrDescendant(child)) return true
-                }
-            }
-            val count = tabBar.childCount
-            if (count > 0) {
-                val profileTab = tabBar.getChild(count - 1)
-                if (AccessibilityUtils.clickNodeOrDescendant(profileTab)) return true
-            }
-        }
-
-        // 3. Text search
-        val profileLabels = listOf("Profil", "Profile")
-        for (label in profileLabels) {
-            val nodes = root.findAccessibilityNodeInfosByText(label)
-            if (!nodes.isNullOrEmpty()) {
-                for (n in nodes) {
-                    if (AccessibilityUtils.clickNodeOrDescendant(n)) return true
-                }
-            }
-        }
-        return false
+        val clicked = clickViewId(root, "com.instagram.android:id/direct_tab") ||
+            clickViewId(root, "com.instagram.android:id/action_bar_inbox_button")
+        if (clicked) recordDMAccess()
+        return clicked
     }
 
-    fun clickHome(root: AccessibilityNodeInfo): Boolean {
-        val feedNodes = root.findAccessibilityNodeInfosByViewId("com.instagram.android:id/feed_tab")
-        if (!feedNodes.isNullOrEmpty()) {
-            for (n in feedNodes) {
-                if (AccessibilityUtils.clickNodeOrDescendant(n)) return true
-            }
-        }
-
-        val tabBars = root.findAccessibilityNodeInfosByViewId("com.instagram.android:id/tab_bar")
-        if (!tabBars.isNullOrEmpty()) {
-            val tabBar = tabBars[0]
-            if (tabBar.childCount > 0) {
-                val homeTab = tabBar.getChild(0)
-                if (AccessibilityUtils.clickNodeOrDescendant(homeTab)) return true
-            }
-        }
-
-        val homeLabels = listOf("Beranda", "Home")
-        for (label in homeLabels) {
-            val nodes = root.findAccessibilityNodeInfosByText(label)
-            if (!nodes.isNullOrEmpty()) {
-                for (n in nodes) {
-                    if (AccessibilityUtils.clickNodeOrDescendant(n)) return true
-                }
-            }
-        }
-        return false
+    fun goToProfile(context: Context, root: AccessibilityNodeInfo): Boolean {
+        if (openScreen(context, "profile")) return true
+        return clickViewId(root, "com.instagram.android:id/profile_tab")
     }
 
-    fun clickSearch(root: AccessibilityNodeInfo): Boolean {
-        val searchNodes = root.findAccessibilityNodeInfosByViewId("com.instagram.android:id/search_tab")
-        if (!searchNodes.isNullOrEmpty()) {
-            for (n in searchNodes) {
-                if (AccessibilityUtils.clickNodeOrDescendant(n)) return true
-            }
-        }
-
-        val tabBars = root.findAccessibilityNodeInfosByViewId("com.instagram.android:id/tab_bar")
-        if (!tabBars.isNullOrEmpty()) {
-            val tabBar = tabBars[0]
-            for (i in 0 until tabBar.childCount) {
-                val child = tabBar.getChild(i) ?: continue
-                val resId = child.viewIdResourceName ?: ""
-                if (resId.contains("search_tab")) {
-                    if (AccessibilityUtils.clickNodeOrDescendant(child)) return true
-                }
-            }
-            if (tabBar.childCount >= 4) {
-                val searchTab = tabBar.getChild(3)
-                if (AccessibilityUtils.clickNodeOrDescendant(searchTab)) return true
-            }
-        }
-        return false
+    fun goToHome(context: Context, root: AccessibilityNodeInfo): Boolean {
+        if (openScreen(context, "mainfeed")) return true
+        return clickViewId(root, "com.instagram.android:id/feed_tab")
     }
 
-    fun redirectToAllowedScreen(root: AccessibilityNodeInfo, rules: Set<String>): Boolean {
+    fun redirectToAllowedScreen(
+        context: Context,
+        root: AccessibilityNodeInfo,
+        rules: Set<String>
+    ): Boolean {
         val dmOnly = rules.contains("dm_profile_only")
         val homeBlocked = rules.contains("disable_home") || dmOnly
 
         return if (dmOnly || homeBlocked) {
-            if (!clickDM(root)) clickProfile(root) else true
+            if (!goToDm(context, root)) goToProfile(context, root) else true
         } else {
-            clickHome(root)
+            goToHome(context, root)
         }
     }
 }
