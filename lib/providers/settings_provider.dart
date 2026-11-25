@@ -6,7 +6,7 @@ class SettingsProvider extends ChangeNotifier {
   String _languageCode = 'id'; // Default to Bahasa Indonesia
 
   bool _usagePermissionGranted = false;
-  bool _notificationPermissionGranted = false;
+  bool _notificationPermissionGranted = true;
   bool _overlayPermissionGranted = false;
   bool _accessibilityPermissionGranted = false;
   bool _batteryOptimizationIgnored = false;
@@ -37,16 +37,14 @@ class SettingsProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// Request overlay permission from the system, then refresh live state.
-  Future<void> toggleOverlayPermission() async {
-    await requestOverlayPermission();
-    await refreshPermissions();
+  void toggleNotificationPermission() {
+    _notificationPermissionGranted = !_notificationPermissionGranted;
+    notifyListeners();
   }
 
-  /// Notification permission is declared in the manifest; no runtime toggle
-  /// exists on Android 13+. Keep state synced with the system on refresh.
-  Future<void> toggleNotificationPermission() async {
-    await refreshPermissions();
+  void toggleOverlayPermission() {
+    _overlayPermissionGranted = !_overlayPermissionGranted;
+    notifyListeners();
   }
 
   void setAccessibilityPermission(bool granted) {

@@ -15,7 +15,7 @@ class YouTubeHandler : AppFeatureHandler {
     override val supportedPackages: Set<String> = setOf("com.google.android.youtube")
 
     private var lastNavTimestamp = 0L
-    private val NAV_COOLDOWN_MS = 300L
+    private val NAV_COOLDOWN_MS = 1400L
 
     override fun onFastRedirect(
         service: AccessibilityService,
@@ -45,8 +45,6 @@ class YouTubeHandler : AppFeatureHandler {
         hideImmediate: () -> Unit
     ) {
         if (rules.contains("disable_shorts") && isShortsActive(root, null)) {
-            // Instant redirect on Shorts — no cooldown wait, no overlay delay
-            lastNavTimestamp = System.currentTimeMillis()
             redirectToHome(service, root)
             return
         }
@@ -54,7 +52,7 @@ class YouTubeHandler : AppFeatureHandler {
         if (rules.contains("disable_home")) {
             // Overlay is open/hidden when in Search, Profile/Account, or Upload/Create
             if (isInSearchMode(root) || isProfileOrAccountActive(root) || isUploadOrCreationActive(root)) {
-                scheduleHide(40L)
+                scheduleHide(150L)
                 return
             }
 
@@ -71,7 +69,7 @@ class YouTubeHandler : AppFeatureHandler {
                 )
                 return
             }
-            scheduleHide(80L)
+            scheduleHide(250L)
             return
         }
 

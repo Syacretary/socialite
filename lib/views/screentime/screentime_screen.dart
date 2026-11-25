@@ -7,8 +7,6 @@ import '../../providers/screentime_provider.dart';
 import '../../providers/settings_provider.dart';
 import '../widgets/custom_app_bar.dart';
 import '../widgets/app_management_drawer.dart';
-import '../../core/animation/staggered_content.dart';
-import '../../core/animation/rubber_band_scroll.dart';
 
 class ScreentimeScreen extends StatelessWidget {
   const ScreentimeScreen({super.key});
@@ -42,18 +40,18 @@ class ScreentimeScreen extends StatelessWidget {
                 // Clean Header
                 CustomHeader(title: loc.get('screentimeTitle')),
 
-                // Rubber-band scroll with staggered reveal
+                // Feather scroll wrapper with stable native scroll
                 Expanded(
                   child: FeatherScrollWrapper(
-                    child: RubberBandScrollView(
+                    child: SingleChildScrollView(
+                      physics: const AlwaysScrollableScrollPhysics(),
                       padding: const EdgeInsets.fromLTRB(16, 2, 16, 80),
-                      child: StaggeredContent(
-                        duration: const Duration(milliseconds: 500),
-                        staggerDelay: const Duration(milliseconds: 120),
-                        curves: Curves.easeOut,
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min, // Hug content tightly
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
                         children: [
                           // PERMISSION CARD
-                          _buildPermissionBanner(context, loc, isDark, settings, primaryColor),
+                          _buildPermissionBanner(context, loc, isDark, screentimeProvider, settings, primaryColor),
 
                           const SizedBox(height: 10),
 
@@ -86,11 +84,12 @@ class ScreentimeScreen extends StatelessWidget {
     BuildContext context,
     AppLocalizations loc,
     bool isDark,
+    ScreentimeProvider screentimeProvider,
     SettingsProvider settings,
     Color primaryColor,
   ) {
     final theme = Theme.of(context);
-    final hasPermission = settings.usagePermissionGranted;
+    final hasPermission = screentimeProvider.hasUsagePermission || settings.usagePermissionGranted;
 
     if (hasPermission) {
       return Container(
@@ -114,9 +113,9 @@ class ScreentimeScreen extends StatelessWidget {
               ),
             ),
             GestureDetector(
-              onTap: () async {
-                settings.requestUsagePermission();
-                await settings.refreshPermissions();
+              onTap: () {
+                screentimeProvider.toggleUsagePermission();
+                settings.setUsagePermission(!hasPermission);
               },
               child: Text(
                 'Ubah',
@@ -160,10 +159,10 @@ class ScreentimeScreen extends StatelessWidget {
                 ),
                 const SizedBox(height: 8),
                 ElevatedButton(
-                  onPressed: () async {
+                  onPressed: () {
                     HapticFeedback.mediumImpact();
-                    await settings.requestUsagePermission();
-                    await settings.refreshPermissions();
+                    screentimeProvider.grantUsagePermission();
+                    settings.setUsagePermission(true);
                   },
                   style: ElevatedButton.styleFrom(
                     backgroundColor: primaryColor,

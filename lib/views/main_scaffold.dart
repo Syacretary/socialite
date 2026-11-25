@@ -7,7 +7,6 @@ import '../providers/app_management_provider.dart';
 import '../providers/settings_provider.dart';
 import '../services/feature_block_service.dart';
 import '../services/limit_enforcement_service.dart';
-import '../core/animation/squash_stretch_navbar.dart';
 import 'manage_app/manage_app_screen.dart';
 import 'screentime/screentime_screen.dart';
 import 'settings/settings_screen.dart';
@@ -106,29 +105,77 @@ class _MainScaffoldState extends State<MainScaffold> with WidgetsBindingObserver
                 child: BackdropFilter(
                   filter: ImageFilter.blur(sigmaX: 30, sigmaY: 30),
                   child: Container(
-                    height: 64,
-                    padding: const EdgeInsets.all(6),
+                    height: 60,
+                    padding: const EdgeInsets.all(4),
                     decoration: BoxDecoration(
                       color: navBgColor.withOpacity(0.92),
-                      borderRadius: BorderRadius.circular(32),
+                      borderRadius: BorderRadius.circular(30),
+                      // NO OUTLINES
                     ),
-                    child: SquashStretchNavbar(
-                      currentIndex: _currentIndex,
-                      onTap: (i) {
-                        if (_currentIndex != i) {
-                          HapticFeedback.selectionClick();
-                          setState(() {
-                            _currentIndex = i;
-                          });
-                        }
+                    child: LayoutBuilder(
+                      builder: (context, constraints) {
+                        final tabWidth = constraints.maxWidth / 3;
+
+                        return Stack(
+                          children: [
+                            // SLIDING ANIMATED PILL INDICATOR
+                            AnimatedPositioned(
+                              duration: const Duration(milliseconds: 260),
+                              curve: Curves.easeOutCubic,
+                              left: _currentIndex * tabWidth,
+                              top: 0,
+                              bottom: 0,
+                              width: tabWidth,
+                              child: Container(
+                                decoration: BoxDecoration(
+                                  color: primaryColor,
+                                  borderRadius: BorderRadius.circular(26),
+                                  boxShadow: [
+                                    BoxShadow(
+                                      color: Colors.black.withOpacity(isDark ? 0.35 : 0.08),
+                                      blurRadius: 12,
+                                      offset: const Offset(0, 3),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+
+                            // TAB ITEMS
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: _buildNavItem(
+                                    index: 0,
+                                    icon: Icons.tune_rounded,
+                                    label: loc.get('navManage'),
+                                    isDark: isDark,
+                                    primaryColor: primaryColor,
+                                  ),
+                                ),
+                                Expanded(
+                                  child: _buildNavItem(
+                                    index: 1,
+                                    icon: Icons.hourglass_top_rounded,
+                                    label: loc.get('navScreentime'),
+                                    isDark: isDark,
+                                    primaryColor: primaryColor,
+                                  ),
+                                ),
+                                Expanded(
+                                  child: _buildNavItem(
+                                    index: 2,
+                                    icon: Icons.settings_rounded,
+                                    label: loc.get('navSettings'),
+                                    isDark: isDark,
+                                    primaryColor: primaryColor,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ],
+                        );
                       },
-                      items: [
-                        NavItem(icon: Icons.tune_rounded, label: loc.get('navManage')),
-                        NavItem(icon: Icons.hourglass_top_rounded, label: loc.get('navScreentime')),
-                        NavItem(icon: Icons.settings_rounded, label: loc.get('navSettings')),
-                      ],
-                      primaryColor: primaryColor,
-                      isDark: isDark,
                     ),
                   ),
                 ),
@@ -140,4 +187,55 @@ class _MainScaffoldState extends State<MainScaffold> with WidgetsBindingObserver
     );
   }
 
+  Widget _buildNavItem({
+    required int index,
+    required IconData icon,
+    required String label,
+    required bool isDark,
+    required Color primaryColor,
+  }) {
+    final isSelected = _currentIndex == index;
+
+    return GestureDetector(
+      onTap: () {
+        if (_currentIndex != index) {
+          HapticFeedback.selectionClick();
+          setState(() {
+            _currentIndex = index;
+          });
+        }
+      },
+      behavior: HitTestBehavior.opaque,
+      child: Center(
+        child: AnimatedScale(
+          duration: const Duration(milliseconds: 200),
+          scale: isSelected ? 1.05 : 1.0,
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(
+                icon,
+                size: 18,
+                color: isSelected
+                    ? (isDark ? const Color(0xFF000000) : const Color(0xFFFFFFFF))
+                    : (isDark ? const Color(0xFF777777) : const Color(0xFF888888)),
+              ),
+              if (isSelected) ...[
+                const SizedBox(width: 6),
+                Text(
+                  label,
+                  style: TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: -0.2,
+                    color: isDark ? const Color(0xFF000000) : const Color(0xFFFFFFFF),
+                  ),
+                ),
+              ],
+            ],
+          ),
+        ),
+      ),
+    );
+  }
 }

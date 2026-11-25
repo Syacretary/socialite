@@ -159,21 +159,17 @@ class AppManagementProvider extends ChangeNotifier {
           if (!configMap.containsKey(appId)) continue;
           final appData = configMap[appId] as Map<String, dynamic>;
 
-          final isRestricted = _safeBool(appData['isRestricted']) ?? _apps[i].isRestricted;
-          final dailyLimitMinutes = _safeInt(appData['dailyLimitMinutes']) ?? _apps[i].dailyLimitMinutes;
-          final actionIdx = _safeInt(appData['actionOnLimit']) ?? _apps[i].actionOnLimit.index;
+          final isRestricted = appData['isRestricted'] as bool? ?? _apps[i].isRestricted;
+          final dailyLimitMinutes = appData['dailyLimitMinutes'] as int? ?? _apps[i].dailyLimitMinutes;
+          final actionIdx = appData['actionOnLimit'] as int? ?? _apps[i].actionOnLimit.index;
           final actionOnLimit = LimitAction.values[actionIdx.clamp(0, LimitAction.values.length - 1)];
 
           var features = List<AppFeatureBlock>.from(_apps[i].featureBlocks);
           if (appData.containsKey('features')) {
-            final featMap = appData['features'];
-            if (featMap is Map<String, dynamic>) {
-              for (var j = 0; j < features.length; j++) {
-                if (featMap.containsKey(features[j].id)) {
-                  features[j] = features[j].copyWith(
-                    isBlocked: _safeBool(featMap[features[j].id]) ?? features[j].isBlocked,
-                  );
-                }
+            final featMap = appData['features'] as Map<String, dynamic>;
+            for (var j = 0; j < features.length; j++) {
+              if (featMap.containsKey(features[j].id)) {
+                features[j] = features[j].copyWith(isBlocked: featMap[features[j].id] as bool);
               }
             }
           }
@@ -400,28 +396,5 @@ class AppManagementProvider extends ChangeNotifier {
   /// No-op: the native AccessibilityService owns usage tracking and limit enforcement.
   void incrementUsage(String appId) {
     // No longer needed — the native service tracks real usage via UsageStatsManager.
-  }
-
-  /// Safely decode a bool from JSON, tolerating 0/1, "true"/"false", or bool.
-  static bool? _safeBool(dynamic v) {
-    if (v == null) return null;
-    if (v is bool) return v;
-    if (v is int) return v != 0;
-    if (v is double) return v != 0.0;
-    if (v is String) {
-      final s = v.trim().toLowerCase();
-      if (s == 'true' || s == '1') return true;
-      if (s == 'false' || s == '0') return false;
-    }
-    return null;
-  }
-
-  /// Safely decode an int from JSON, tolerating doubles (30.0 -> 30).
-  static int? _safeInt(dynamic v) {
-    if (v == null) return null;
-    if (v is int) return v;
-    if (v is double) return v.toInt();
-    if (v is String) return int.tryParse(v.trim());
-    return null;
   }
 }

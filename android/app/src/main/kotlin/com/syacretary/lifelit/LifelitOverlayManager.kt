@@ -1,7 +1,6 @@
 package com.syacretary.lifelit
 
 import android.content.Context
-import android.content.Intent
 import android.graphics.Color
 import android.graphics.PixelFormat
 import android.graphics.Typeface
@@ -442,28 +441,11 @@ class LifelitOverlayManager(private val context: Context) {
         } else {
             val row = LinearLayout(context).apply { orientation = LinearLayout.HORIZONTAL }
 
-            // "Tutup" = Close: closes the restricted app entirely (home action).
-            // Highlighted as primary so it's the obvious escape hatch.
-            val closeButton = buildButton("Tutup", primary = true, isDark = isDark) {
+            val closeButton = buildButton("Tutup", primary = false, isDark = isDark) {
                 hideLimitIntervention()
                 onDismiss?.invoke()
-                // Close the restricted app by going to home.
-                val homeIntent = Intent(Intent.ACTION_MAIN).apply {
-                    addCategory(Intent.CATEGORY_HOME)
-                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                }
-                try {
-                    context.startActivity(homeIntent)
-                } catch (_: Exception) {
-                    try {
-                        (context as? android.accessibilityservice.AccessibilityService)
-                            ?.performGlobalAction(android.accessibilityservice.AccessibilityService.GLOBAL_ACTION_HOME)
-                    } catch (_: Exception) {
-                        // Ignore - best effort to close the app
-                    }
-                }
             }
-            val understandButton = buildButton("Paham", primary = false, isDark = isDark) {
+            val understandButton = buildButton("Paham", primary = true, isDark = isDark) {
                 hideLimitIntervention()
                 onDismiss?.invoke()
             }
