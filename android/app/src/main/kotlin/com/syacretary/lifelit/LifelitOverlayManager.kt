@@ -444,6 +444,19 @@ class LifelitOverlayManager(private val context: Context) {
             val closeButton = buildButton("Tutup", primary = false, isDark = isDark) {
                 hideLimitIntervention()
                 onDismiss?.invoke()
+                try {
+                    (context as? android.accessibilityservice.AccessibilityService)
+                        ?.performGlobalAction(android.accessibilityservice.AccessibilityService.GLOBAL_ACTION_HOME)
+                } catch (_: Exception) {
+                    val homeIntent = android.content.Intent(android.content.Intent.ACTION_MAIN).apply {
+                        addCategory(android.content.Intent.CATEGORY_HOME)
+                        addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
+                    }
+                    try {
+                        context.startActivity(homeIntent)
+                    } catch (_: Exception) {
+                    }
+                }
             }
             val understandButton = buildButton("Paham", primary = true, isDark = isDark) {
                 hideLimitIntervention()

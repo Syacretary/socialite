@@ -1,12 +1,17 @@
 package com.syacretary.lifelit
 
 import android.accessibilityservice.AccessibilityService
+import android.app.Notification
+import android.app.NotificationChannel
+import android.app.NotificationManager
 import android.app.usage.UsageStatsManager
 import android.content.Context
 import android.content.Intent
+import android.os.Build
 import android.os.Handler
 import android.os.Looper
 import android.view.accessibility.AccessibilityEvent
+import android.widget.Toast
 import com.syacretary.lifelit.core.AppFeatureHandler
 import com.syacretary.lifelit.features.instagram.InstagramHandler
 import com.syacretary.lifelit.features.tiktok.TikTokHandler
@@ -336,6 +341,12 @@ class LifelitAccessibilityService : AccessibilityService() {
             if (blocked) return
         }
 
+        // If an intervention popup is currently displayed on screen, do NOT allow
+        // feature handlers to run redirects or tamper with the user's focus!
+        if (overlayManager?.isLimitInterventionShowing == true) {
+            return
+        }
+
         // Apps without a feature handler (Reddit, Facebook, etc.) only need the
         // time-limit enforcement above; there is no feature evaluation to run.
         if (handler == null) return
@@ -358,14 +369,14 @@ class LifelitAccessibilityService : AccessibilityService() {
     }
 
     /**
-     * Applies the configured action when [pkg] has exceeded its daily limit.
+     * Applies the configured action when [pkg] has exceeded its daily limit:
+     * - notifyOnly (0): Native system notification only, NO overlay banner.
+     * - popupReminder (1): Modal reminder popup dialog on top of the target app.
+     * - blockAndClose (2): Immediately closes app and navigates to home screen, NO full-screen overlay.
      *
-     * @return true when a full-screen blocker owns the screen and feature
-     *         evaluation should be skipped.
+     * @return true when the screen is occupied or app is closed, skipping feature evaluation.
      */
     private fun enforceTimeLimit(pkg: String, limit: NativeAppLimit): Boolean {
-        val om = overlayManager ?: return false
-
         val appLabel = try {
             val pm = packageManager
             pm.getApplicationLabel(pm.getApplicationInfo(pkg, 0)).toString()
@@ -376,19 +387,17 @@ class LifelitAccessibilityService : AccessibilityService() {
         val limitLabel = formatLimit(limit.dailyLimitMinutes)
 
         return when (limit.actionOnLimit) {
-            0 -> { // notifyOnly
-                if (canShowIntervention(pkg)) {
-                    om.showLimitIntervention(
-                        appName = appLabel,
-                        packageName = pkg,
-                        title = "$appLabel — Batas Tercapai",
-                        message = "Kamu telah menggunakan $limitLabel hari ini.",
-                        mode = LimitInterventionMode.NOTIFY
-                    )
+            0 -> { // notifyOnly: send native system notification, NO overlay
+                if (canSendNotification(pkg)) {
+                    sendNativeLimitNotification(appLabel, limitLabel)
                 }
                 false
             }
-            1 -> { // popupReminder
+            1 -> { // popupReminder: modal reminder popup over external app
+                val om = overlayManager ?: return false
+                if (om.isLimitInterventionShowing) {
+                    return true
+                }
                 if (canShowIntervention(pkg)) {
                     om.showLimitIntervention(
                         appName = appLabel,
@@ -397,26 +406,88 @@ class LifelitAccessibilityService : AccessibilityService() {
                         message = "Kamu telah menggunakan $limitLabel hari ini.\nIstirahatlah sejenak dan kembali besok.",
                         mode = LimitInterventionMode.POPUP
                     )
+                    return true
                 }
                 false
             }
-            else -> { // blockAndClose
+            else -> { // blockAndClose: immediately close app and return to home, NO overlay
                 cancelPendingEval()
                 cancelPendingHide()
-                val shown = om.showLimitIntervention(
-                    appName = appLabel,
-                    packageName = pkg,
-                    title = "$appLabel Diblokir",
-                    message = "Batas harian $limitLabel telah tercapai.\nAkses dikunci hingga hari berikutnya.",
-                    mode = LimitInterventionMode.BLOCK,
-                    onOpenLifelit = { openLifelitApp() }
-                )
-                if (!shown) {
-                    // Last-resort fallback if the overlay window cannot be
-                    // attached (e.g. OEM blocks accessibility overlays).
-                    performGlobalAction(GLOBAL_ACTION_HOME)
-                }
+                overlayManager?.hideAllOverlays()
+
+                // Immediately close the restricted app
+                performGlobalAction(GLOBAL_ACTION_HOME)
+
+                // Brief system toast
+                showBlockToast(appLabel, limitLabel)
                 true
+            }
+        }
+    }
+
+    private val lastNotificationAt = mutableMapOf<String, Long>()
+    private val NOTIFY_COOLDOWN_MS = 300_000L // 5 minutes
+
+    private fun canSendNotification(pkg: String): Boolean {
+        val now = System.currentTimeMillis()
+        val last = lastNotificationAt[pkg] ?: 0L
+        if (now - last < NOTIFY_COOLDOWN_MS) return false
+        lastNotificationAt[pkg] = now
+        return true
+    }
+
+    private fun sendNativeLimitNotification(appName: String, limitLabel: String) {
+        try {
+            val nm = getSystemService(Context.NOTIFICATION_SERVICE) as? NotificationManager ?: return
+            val channelId = "lifelit_limit_channel"
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                val channel = NotificationChannel(
+                    channelId,
+                    "Batas Waktu Penggunaan",
+                    NotificationManager.IMPORTANCE_HIGH
+                ).apply {
+                    description = "Notifikasi batas waktu harian Lifelit"
+                }
+                nm.createNotificationChannel(channel)
+            }
+
+            val iconResId = resources.getIdentifier("ic_notification", "drawable", packageName).let {
+                if (it != 0) it else android.R.drawable.ic_dialog_info
+            }
+
+            val builder = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                Notification.Builder(this, channelId)
+            } else {
+                @Suppress("DEPRECATION")
+                Notification.Builder(this)
+            }
+
+            val notification = builder
+                .setSmallIcon(iconResId)
+                .setContentTitle("$appName — Batas Waktu")
+                .setContentText("Kamu telah menggunakan $appName selama $limitLabel hari ini.")
+                .setAutoCancel(true)
+                .build()
+
+            nm.notify(appName.hashCode(), notification)
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+    }
+
+    private var lastToastTime = 0L
+    private fun showBlockToast(appName: String, limitLabel: String) {
+        val now = System.currentTimeMillis()
+        if (now - lastToastTime < 3500L) return
+        lastToastTime = now
+        handler.post {
+            try {
+                Toast.makeText(
+                    applicationContext,
+                    "Batas harian $appName ($limitLabel) telah tercapai.",
+                    Toast.LENGTH_SHORT
+                ).show()
+            } catch (_: Exception) {
             }
         }
     }
@@ -578,10 +649,9 @@ class LifelitAccessibilityService : AccessibilityService() {
                         isTimeLimitExceeded(pkg, limit.dailyLimitMinutes)
                     ) {
                         enforceTimeLimit(pkg, limit)
-                    } else if (overlayManager?.isBlockingInterventionShowing == true) {
-                        // Limit was raised/removed (or a new day began) while the
-                        // blocker was up: release the screen.
-                        overlayManager?.hideAllOverlays()
+                    } else if (overlayManager?.isLimitInterventionShowing == true) {
+                        // Limit was raised/removed (or a new day began): release the intervention.
+                        overlayManager?.hideLimitIntervention()
                     }
                 }
                 handler.postDelayed(this, LIMIT_CHECK_INTERVAL_MS)

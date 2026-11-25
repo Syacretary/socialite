@@ -41,38 +41,65 @@ object InstagramNavigation {
         return false
     }
 
+    private fun identifyTab(node: AccessibilityNodeInfo, index: Int): InstagramTab {
+        val sb = StringBuilder()
+        fun collectInfo(n: AccessibilityNodeInfo?) {
+            if (n == null) return
+            n.contentDescription?.let { sb.append(" ").append(it) }
+            n.text?.let { sb.append(" ").append(it) }
+            n.viewIdResourceName?.let { sb.append(" ").append(it) }
+            for (i in 0 until n.childCount) {
+                collectInfo(n.getChild(i))
+            }
+        }
+        collectInfo(node)
+        val info = sb.toString().lowercase()
+
+        return when {
+            info.contains("search") || info.contains("cari") || info.contains("explore") || info.contains("jelajahi") -> InstagramTab.SEARCH
+            info.contains("reels") || info.contains("klip") || info.contains("clips") -> InstagramTab.REELS
+            info.contains("direct") || info.contains("pesan") || info.contains("inbox") || info.contains("message") -> InstagramTab.DM
+            info.contains("profile") || info.contains("profil") -> InstagramTab.PROFILE
+            info.contains("feed") || info.contains("beranda") || info.contains("home") -> InstagramTab.HOME
+            index == 0 -> InstagramTab.HOME
+            index == 1 -> InstagramTab.SEARCH
+            index == 2 -> InstagramTab.REELS
+            index == 3 -> InstagramTab.DM
+            index == 4 -> InstagramTab.PROFILE
+            else -> InstagramTab.UNKNOWN
+        }
+    }
+
     /**
      * Determines active tab by checking the isSelected flag on tab_bar children.
      * Guaranteed reliable across all Android devices because Instagram does not offset
      * off-screen tabs to negative coordinates.
      */
     fun getActiveTab(root: AccessibilityNodeInfo): InstagramTab {
+        // Fast-path: if user is typing in search edit text, active tab is SEARCH
+        if (isSearchTyping(root)) {
+            return InstagramTab.SEARCH
+        }
+
         val tabBar = root.findAccessibilityNodeInfosByViewId("com.instagram.android:id/tab_bar")
         if (!tabBar.isNullOrEmpty()) {
             val bar = tabBar[0]
             for (childIdx in 0 until bar.childCount) {
                 val child = bar.getChild(childIdx) ?: continue
                 if (isTabSelected(child)) {
-                    val resId = child.viewIdResourceName ?: ""
-                    return when {
-                        resId.contains("feed_tab") || childIdx == 0 -> InstagramTab.HOME
-                        resId.contains("clips_tab") || childIdx == 1 -> InstagramTab.REELS
-                        resId.contains("direct_tab") || childIdx == 2 -> InstagramTab.DM
-                        resId.contains("search_tab") || childIdx == 3 -> InstagramTab.SEARCH
-                        resId.contains("profile_tab") || childIdx == 4 -> InstagramTab.PROFILE
-                        else -> InstagramTab.UNKNOWN
-                    }
+                    val tab = identifyTab(child, childIdx)
+                    if (tab != InstagramTab.UNKNOWN) return tab
                 }
             }
         }
 
         // Fallback: search individual tab IDs directly
         val tabIds = listOf(
-            "com.instagram.android:id/feed_tab" to InstagramTab.HOME,
+            "com.instagram.android:id/search_tab" to InstagramTab.SEARCH,
             "com.instagram.android:id/clips_tab" to InstagramTab.REELS,
             "com.instagram.android:id/direct_tab" to InstagramTab.DM,
-            "com.instagram.android:id/search_tab" to InstagramTab.SEARCH,
-            "com.instagram.android:id/profile_tab" to InstagramTab.PROFILE
+            "com.instagram.android:id/profile_tab" to InstagramTab.PROFILE,
+            "com.instagram.android:id/feed_tab" to InstagramTab.HOME
         )
         for ((id, tab) in tabIds) {
             val nodes = root.findAccessibilityNodeInfosByViewId(id)
@@ -84,11 +111,8 @@ object InstagramNavigation {
         }
 
         // Secondary fallback for Home:
-        // In Home tab, action_bar_inbox_button or main_feed_action_bar is present in top bar
+        // In Home tab, main_feed_action_bar is present in top bar
         if (!root.findAccessibilityNodeInfosByViewId("com.instagram.android:id/main_feed_action_bar").isNullOrEmpty()) {
-            return InstagramTab.HOME
-        }
-        if (!root.findAccessibilityNodeInfosByViewId("com.instagram.android:id/action_bar_inbox_button").isNullOrEmpty()) {
             return InstagramTab.HOME
         }
 
@@ -138,22 +162,44 @@ object InstagramNavigation {
         return false
     }
 
-    fun isSearchOrExploreActive(context: Context, root: AccessibilityNodeInfo): Boolean {
-        // Guard: if confirmed on Home Feed, Search is NOT active
-        if (!root.findAccessibilityNodeInfosByViewId("com.instagram.android:id/main_feed_action_bar").isNullOrEmpty()) {
-            return false
-        }
+    fun isSearchTyping(root: AccessibilityNodeInfo): Boolean {
         val searchEditIds = listOf(
             "com.instagram.android:id/action_bar_search_edit_text",
             "com.instagram.android:id/search_edit_text",
-            "com.instagram.android:id/action_bar_search_layout",
             "com.instagram.android:id/search_src_text"
         )
         for (id in searchEditIds) {
             val nodes = root.findAccessibilityNodeInfosByViewId(id)
             if (!nodes.isNullOrEmpty()) {
                 for (n in nodes) {
-                    if (AccessibilityUtils.isNodeVisibleOnScreen(context, n) && (n.isFocused || n.isEditable)) {
+                    if (n.isFocused || n.isEditable) return true
+                }
+            }
+        }
+        return false
+    }
+
+    fun isSearchOrExploreActive(context: Context, root: AccessibilityNodeInfo): Boolean {
+        // Guard: if confirmed on Home Feed main action bar, Search is NOT active
+        if (!root.findAccessibilityNodeInfosByViewId("com.instagram.android:id/main_feed_action_bar").isNullOrEmpty()) {
+            return false
+        }
+        val searchIds = listOf(
+            "com.instagram.android:id/action_bar_search_edit_text",
+            "com.instagram.android:id/search_edit_text",
+            "com.instagram.android:id/action_bar_search_layout",
+            "com.instagram.android:id/search_src_text",
+            "com.instagram.android:id/action_bar_search_hints_text_view",
+            "com.instagram.android:id/echo_search_bar",
+            "com.instagram.android:id/search_tab",
+            "com.instagram.android:id/explore_grid",
+            "com.instagram.android:id/explore_event_viewer"
+        )
+        for (id in searchIds) {
+            val nodes = root.findAccessibilityNodeInfosByViewId(id)
+            if (!nodes.isNullOrEmpty()) {
+                for (n in nodes) {
+                    if (AccessibilityUtils.isNodeVisibleOnScreen(context, n)) {
                         return true
                     }
                 }

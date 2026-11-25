@@ -27,6 +27,16 @@ class InstagramHandler : AppFeatureHandler {
         val now = System.currentTimeMillis()
         if (now - lastNavTimestamp < NAV_COOLDOWN_MS) return false
 
+        // 0. Search & Explore guard: NEVER redirect when user is in Search, typing, or Explore
+        if (InstagramNavigation.isSearchOrExploreActive(service, root) || InstagramNavigation.isSearchTyping(root)) {
+            return false
+        }
+
+        val activeTab = InstagramNavigation.getActiveTab(root)
+        if (activeTab == InstagramTab.SEARCH || activeTab == InstagramTab.DM || activeTab == InstagramTab.PROFILE) {
+            return false
+        }
+
         val dmOnly = rules.contains("dm_profile_only")
         val homeBlocked = rules.contains("disable_home") || dmOnly
         val reelsBlocked = rules.contains("disable_reels") || dmOnly
@@ -108,9 +118,9 @@ class InstagramHandler : AppFeatureHandler {
             return
         }
 
-        // 3. Search / Explore tab
-        if (activeTab == InstagramTab.SEARCH) {
-            if (feedsBlocked) {
+        // 3. Search / Explore tab or typing in Search
+        if (activeTab == InstagramTab.SEARCH || InstagramNavigation.isSearchOrExploreActive(service, root)) {
+            if (feedsBlocked && !InstagramNavigation.isSearchTyping(root)) {
                 val bounds = InstagramFeedsFeature.calculateExploreBounds(service, root)
                 InstagramFeedsFeature.showExploreFeedOverlay(overlayManager, bounds)
                 return
