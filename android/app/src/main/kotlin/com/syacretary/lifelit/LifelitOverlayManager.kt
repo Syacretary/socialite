@@ -344,7 +344,7 @@ class LifelitOverlayManager(private val context: Context) {
         interventionShowing = false
     }
 
-    // ── Mindful Trigger Shake Pop-up (Exaggeration Shake + Auto-dismiss 1.5s) ──
+    // ── Mindful Trigger Alert (Exaggeration Shake + Auto-dismiss) ────────────
     private var shakeAlertView: View? = null
     private var shakeAlertParams: WindowManager.LayoutParams? = null
     private var isShakeAlertShowing = false
@@ -352,18 +352,29 @@ class LifelitOverlayManager(private val context: Context) {
     private var lastShakeAlertTime = 0L
 
     /**
-     * Shows an exaggerated shake alert pop-up when user triggers a blocked feature
-     * (Shorts, Beranda, Reels, FYP). Shakes dramatically on impact to snap the user
-     * out of the automatic mindless scrolling trance, displays mindful consciousness
-     * recovery copy, and automatically disappears 1.5 seconds later.
+     * Shows a mindful pattern-interrupt overlay when the user triggers a blocked feature.
+     *
+     * Design principles applied:
+     * - Exaggeration: dramatic shake-punch on entry snaps attention back
+     * - Squash & Stretch: scale 0.82→1.06→1.0 reinforces physical impact
+     * - Timing: total animation ≤ 300ms so it feels snappy, not slow
+     * - Peak-End: warm fade-up exit creates a positive memory of the moment
+     * - Touchable: user can tap to dismiss early (respects agency)
+     *
+     * @param emoji   Lead character — sets the emotional register at a glance
+     * @param title   Bold single-line headline; short, specific to the blocked action
+     * @param message 1–2 line body; non-judgmental, curiosity-triggering, empowering
+     * @param accentHex Bottom accent bar colour, defaults to soft teal
      */
     fun showMindfulShakeAlert(
-        title: String = "Sadar Sejenak",
-        message: String = "Tarik napas perlahan. Apakah ini pilihan sadarmu atau sekadar autopilot jempol?"
+        emoji: String = "🌿",
+        title: String = "Hei, Autopilot!",
+        message: String = "Napas dalam... Ini pilihan sadarmu atau kebiasaan lama?",
+        accentHex: String = "#2D6A4F"
     ) {
         val now = System.currentTimeMillis()
         if (now - lastShakeAlertTime < 1600L && isShakeAlertShowing) {
-            // Already visible: re-shake with exaggeration to reinforce awareness
+            // Already visible — re-shake to reinforce awareness without rebuilding
             shakeAlertView?.let { performExaggeratedShake(it) }
             return
         }
@@ -371,19 +382,19 @@ class LifelitOverlayManager(private val context: Context) {
 
         hideMindfulShakeAlert()
 
-        val alertCard = buildShakeAlertCard(title, message)
+        val alertCard = buildShakeAlertCard(emoji, title, message, accentHex)
         val params = WindowManager.LayoutParams(
             WindowManager.LayoutParams.MATCH_PARENT,
             WindowManager.LayoutParams.WRAP_CONTENT,
             accessibilityOverlayType(),
+            // Touchable: FLAG_NOT_TOUCHABLE removed so user can tap-to-dismiss
             WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
-                    WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE or
                     WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN,
             PixelFormat.TRANSLUCENT
         ).apply {
             gravity = Gravity.TOP or Gravity.CENTER_HORIZONTAL
             x = 0
-            y = statusBarHeightPx() + dp(14)
+            y = statusBarHeightPx() + dp(10)
         }
 
         shakeAlertView = alertCard
@@ -393,15 +404,23 @@ class LifelitOverlayManager(private val context: Context) {
             windowManager.addView(alertCard, params)
             isShakeAlertShowing = true
 
-            // Trigger the Exaggeration Shake Animation on impact
-            performExaggeratedShake(alertCard)
+            // Entry: fade + slight drop-in then exaggerated shake
+            alertCard.alpha = 0f
+            alertCard.translationY = -dp(12).toFloat()
+            alertCard.animate()
+                .alpha(1f)
+                .translationY(0f)
+                .setDuration(180L)
+                .withEndAction { performExaggeratedShake(alertCard) }
+                .start()
 
-            // Auto-dismiss in exactly 1.5 seconds (1500ms)
-            val dismissRunnable = Runnable {
-                hideMindfulShakeAlertWithAnimation()
-            }
-            shakeAlertDismissRunnable = dismissRunnable
-            handler.postDelayed(dismissRunnable, 1500L)
+            // Tap-to-dismiss
+            alertCard.setOnClickListener { hideMindfulShakeAlertWithAnimation() }
+
+            // Auto-dismiss after 2.2s — slightly longer than 1.5s original to let content sink in
+            val r = Runnable { hideMindfulShakeAlertWithAnimation() }
+            shakeAlertDismissRunnable = r
+            handler.postDelayed(r, 2200L)
         } catch (e: Exception) {
             e.printStackTrace()
             shakeAlertView = null
@@ -411,38 +430,41 @@ class LifelitOverlayManager(private val context: Context) {
     }
 
     private fun performExaggeratedShake(view: View) {
-        // Dramatic horizontal shake (Exaggeration principle)
-        val shakeAnim = ObjectAnimator.ofFloat(
+        // Squash & stretch scale punch: 0.82 → 1.06 → 1.0
+        val sx = ObjectAnimator.ofFloat(view, "scaleX", 0.82f, 1.06f, 0.99f, 1.0f).apply {
+            duration = 280L
+            interpolator = DecelerateInterpolator(1.4f)
+        }
+        val sy = ObjectAnimator.ofFloat(view, "scaleY", 0.82f, 1.06f, 0.99f, 1.0f).apply {
+            duration = 280L
+            interpolator = DecelerateInterpolator(1.4f)
+        }
+        // Horizontal shake burst (Exaggeration principle)
+        val shake = ObjectAnimator.ofFloat(
             view, "translationX",
-            0f, -28f, 28f, -22f, 22f, -14f, 14f, -6f, 6f, 0f
+            0f, -26f, 26f, -20f, 20f, -12f, 12f, -5f, 5f, 0f
         ).apply {
             duration = 420L
             interpolator = DecelerateInterpolator()
         }
 
-        // Accompanying scale punch
-        val scaleX = ObjectAnimator.ofFloat(view, "scaleX", 0.90f, 1.05f, 0.98f, 1.0f).apply { duration = 300L }
-        val scaleY = ObjectAnimator.ofFloat(view, "scaleY", 0.90f, 1.05f, 0.98f, 1.0f).apply { duration = 300L }
-
         AnimatorSet().apply {
-            playTogether(shakeAnim, scaleX, scaleY)
+            playTogether(sx, sy, shake)
             start()
         }
 
-        try {
-            view.performHapticFeedback(HapticFeedbackConstants.LONG_PRESS)
-        } catch (_: Exception) {}
+        try { view.performHapticFeedback(HapticFeedbackConstants.LONG_PRESS) } catch (_: Exception) {}
     }
 
     private fun hideMindfulShakeAlertWithAnimation() {
         val view = shakeAlertView ?: return
         view.animate()
             .alpha(0f)
-            .translationY(-dp(20).toFloat())
+            .translationY(-dp(16).toFloat())
+            .scaleX(0.92f)
+            .scaleY(0.92f)
             .setDuration(200L)
-            .withEndAction {
-                hideMindfulShakeAlert()
-            }
+            .withEndAction { hideMindfulShakeAlert() }
             .start()
     }
 
@@ -453,66 +475,100 @@ class LifelitOverlayManager(private val context: Context) {
         }
         val view = shakeAlertView
         if (view != null) {
-            try {
-                windowManager.removeView(view)
-            } catch (e: Exception) {
-                e.printStackTrace()
-            }
+            try { windowManager.removeView(view) } catch (e: Exception) { e.printStackTrace() }
         }
         shakeAlertView = null
         shakeAlertParams = null
         isShakeAlertShowing = false
     }
 
-    private fun buildShakeAlertCard(title: String, message: String): View {
+    private fun buildShakeAlertCard(
+        emoji: String,
+        title: String,
+        message: String,
+        accentHex: String
+    ): View {
+        val density = context.resources.displayMetrics.density
+
+        // ── Outer wrapper (horizontal padding only) ────────────────────
         val root = FrameLayout(context).apply {
-            setPadding(dp(16), 0, dp(16), 0)
+            setPadding(dp(14), 0, dp(14), 0)
+            isClickable = true
         }
 
+        // ── Card shell ─────────────────────────────────────────────────
         val card = LinearLayout(context).apply {
+            orientation = LinearLayout.VERTICAL
+            background = GradientDrawable().apply {
+                cornerRadius = dp(22).toFloat()
+                setColor(Color.parseColor("#F21A1A1A"))      // dark glass
+                setStroke(dp(1), Color.parseColor("#33FFFFFF")) // hairline border
+            }
+            elevation = dp(16).toFloat()
+            isClickable = true
+        }
+
+        // ── Top content row (emoji + text) ─────────────────────────────
+        val contentRow = LinearLayout(context).apply {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER_VERTICAL
-            setPadding(dp(16), dp(12), dp(16), dp(12))
-            background = GradientDrawable().apply {
-                cornerRadius = dp(20).toFloat()
-                setColor(Color.parseColor("#F00D0D0D")) // Deep AMOLED
-                setStroke(dp(1), Color.parseColor("#55FFFFFF")) // Crisp luminous border
-            }
-            elevation = dp(14).toFloat()
+            setPadding(dp(16), dp(14), dp(14), dp(12))
         }
 
-        // Mindful emblem spark icon
-        val icon = TextView(context).apply {
-            text = "⚡"
-            textSize = 22f
-            setPadding(0, 0, dp(12), 0)
-        }
-        card.addView(icon)
+        // Emoji badge (rounded square)
+        contentRow.addView(TextView(context).apply {
+            text = emoji
+            textSize = 26f
+            gravity = Gravity.CENTER
+            setPadding(dp(4), dp(2), dp(14), dp(2))
+        })
 
+        // Text column
         val textCol = LinearLayout(context).apply {
             orientation = LinearLayout.VERTICAL
         }
-
         textCol.addView(TextView(context).apply {
             text = title
             setTextColor(Color.WHITE)
-            textSize = 13f
+            textSize = 13.5f
             typeface = Typeface.DEFAULT_BOLD
             letterSpacing = -0.02f
         })
-
         textCol.addView(TextView(context).apply {
             text = message
             setTextColor(Color.parseColor("#CCCCCC"))
-            textSize = 10.5f
-            setLineSpacing(dp(1).toFloat(), 1.25f)
+            textSize = 11f
+            setLineSpacing((density * 1.5f), 1.3f)
+            setPadding(0, dp(3), 0, 0)
         })
 
-        card.addView(textCol, LinearLayout.LayoutParams(
-            0,
-            LinearLayout.LayoutParams.WRAP_CONTENT,
-            1f
+        contentRow.addView(textCol, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f))
+
+        // "×" dismiss hint
+        contentRow.addView(TextView(context).apply {
+            text = "×"
+            setTextColor(Color.parseColor("#555555"))
+            textSize = 18f
+            gravity = Gravity.CENTER
+            setPadding(dp(10), 0, 0, 0)
+        })
+
+        card.addView(contentRow, LinearLayout.LayoutParams(
+            LinearLayout.LayoutParams.MATCH_PARENT,
+            LinearLayout.LayoutParams.WRAP_CONTENT
         ))
+
+        // ── Accent bottom bar ──────────────────────────────────────────
+        card.addView(View(context).apply {
+            try {
+                background = GradientDrawable().apply {
+                    cornerRadii = floatArrayOf(0f, 0f, 0f, 0f, dp(22).toFloat(), dp(22).toFloat(), dp(22).toFloat(), dp(22).toFloat())
+                    setColor(Color.parseColor(accentHex))
+                }
+            } catch (_: Exception) {
+                setBackgroundColor(Color.parseColor("#2D6A4F"))
+            }
+        }, LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, dp(3)))
 
         root.addView(card, FrameLayout.LayoutParams(
             FrameLayout.LayoutParams.MATCH_PARENT,

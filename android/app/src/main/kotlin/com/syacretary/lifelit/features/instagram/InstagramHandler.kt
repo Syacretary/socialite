@@ -48,8 +48,10 @@ class InstagramHandler : AppFeatureHandler {
         if (storiesBlocked && InstagramStoriesFeature.isStoryActive(service, root, event)) {
             lastNavTimestamp = now
             overlayManager?.showMindfulShakeAlert(
-                title = "Stories Dibatasi",
-                message = "Berhenti sejenak. Apa yang benar-benar penting untukmu saat ini?"
+                emoji = "👁️",
+                title = "Stories — Highlight Reel",
+                message = "Yang kamu lihat adalah versi terbaik hidup orang lain, bukan kenyataannya.",
+                accentHex = "#1565C0"
             )
             InstagramStoriesFeature.blockStory(service)
             return true
@@ -67,8 +69,10 @@ class InstagramHandler : AppFeatureHandler {
 
             lastNavTimestamp = now
             overlayManager?.showMindfulShakeAlert(
-                title = "Reels Dibatasi",
-                message = "Jebakan dopamin singkat terdeteksi. Tarik napas 3 detik dan sadari pilihanmu."
+                emoji = "🌀",
+                title = "Reels — Scroll Tanpa Akhir",
+                message = "Konten ini dioptimalkan AI untuk mengikatmu. Kamu yang putuskan kapan berhenti.",
+                accentHex = "#AD1457"
             )
             InstagramReelsFeature.handleReelsBlocked(service, root, rules, isNavBarReels)
             return true
@@ -80,8 +84,10 @@ class InstagramHandler : AppFeatureHandler {
             if (activeTab == InstagramTab.HOME) {
                 lastNavTimestamp = now
                 overlayManager?.showMindfulShakeAlert(
-                    title = "Beranda Instagram Dibatasi",
-                    message = "Tarik napas dalam-dalam. Apakah ini pilihan sadarmu atau sekadar autopilot jempol?"
+                    emoji = "🌊",
+                    title = "Feed Autopilot Terdeteksi",
+                    message = "Scroll tanpa tujuan menghilangkan waktu tanpa terasa. Ada yang lebih bermakna?",
+                    accentHex = "#00695C"
                 )
                 val clicked = InstagramHomeFeature.handleHomeBlocked(service, root)
                 if (clicked) return true

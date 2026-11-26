@@ -32,8 +32,10 @@ class YouTubeHandler : AppFeatureHandler {
         if (isShortsActive(root, event)) {
             lastNavTimestamp = now
             overlayManager?.showMindfulShakeAlert(
-                title = "Shorts Dibatasi",
-                message = "Tarik napas perlahan. Sadari autopilot jempolmu dan kembali ke tujuan utamamu."
+                emoji = "⏱️",
+                title = "Shorts — Dirancang Tanpa Jeda",
+                message = "Video 60 detik memicu dopamin kecil berulang. Kamu bisa lebih dari ini.",
+                accentHex = "#7B2D8B"
             )
             redirectToHome(service, root)
             return true
@@ -51,8 +53,10 @@ class YouTubeHandler : AppFeatureHandler {
     ) {
         if (rules.contains("disable_shorts") && isShortsActive(root, null)) {
             overlayManager.showMindfulShakeAlert(
-                title = "Shorts Dibatasi",
-                message = "Tarik napas perlahan. Sadari autopilot jempolmu dan kembali ke tujuan utamamu."
+                emoji = "⏱️",
+                title = "Shorts — Dirancang Tanpa Jeda",
+                message = "Video 60 detik memicu dopamin kecil berulang. Kamu bisa lebih dari ini.",
+                accentHex = "#7B2D8B"
             )
             redirectToHome(service, root)
             return
@@ -69,8 +73,10 @@ class YouTubeHandler : AppFeatureHandler {
             if (isHomeTab(root)) {
                 val bounds = calculateFeedBounds(service, root)
                 overlayManager.showMindfulShakeAlert(
-                    title = "Beranda YouTube Dibatasi",
-                    message = "Feed tanpa akhir mencuri waktumu. Gunakan bilah pencarian jika ada video yang ingin dicari."
+                    emoji = "🎯",
+                    title = "Punya tujuan menonton?",
+                    message = "Rekomendasi dirancang untuk menghisap perhatianmu. Kamu yang pegang remote.",
+                    accentHex = "#C0392B"
                 )
                 overlayManager.showFeedBlockOverlay(
                     appName = "YouTube",

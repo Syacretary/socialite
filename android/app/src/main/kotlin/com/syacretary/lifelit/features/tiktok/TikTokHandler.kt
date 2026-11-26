@@ -40,8 +40,10 @@ class TikTokHandler : AppFeatureHandler {
         if (storiesBlocked && TikTokNavigation.isStoryActive(root, event)) {
             lastNavTimestamp = now
             overlayManager?.showMindfulShakeAlert(
-                title = "Stories Dibatasi",
-                message = "Berhenti sejenak. Kembalikan fokusmu ke hal yang bermakna."
+                emoji = "👆",
+                title = "Stories TikTok — Sepintas Lalu",
+                message = "Konten yang berlalu-lalang membuatmu terlupa waktu. Napas dalam, lanjut dengan sadar.",
+                accentHex = "#1A237E"
             )
             service.performGlobalAction(AccessibilityService.GLOBAL_ACTION_BACK)
             return true
@@ -53,8 +55,10 @@ class TikTokHandler : AppFeatureHandler {
             if (activeTab != TikTokTab.INBOX && activeTab != TikTokTab.PROFILE) {
                 lastNavTimestamp = now
                 overlayManager?.showMindfulShakeAlert(
-                    title = "TikTok Dibatasi",
-                    message = "Hanya DM dan Profil yang diizinkan. Sadari autopilot jempolmu."
+                    emoji = "🔒",
+                    title = "Mode DM & Profil Aktif",
+                    message = "Kamu sendiri yang mengatur batasan ini. Percayai pilihanmu.",
+                    accentHex = "#37474F"
                 )
                 val redirected = if (!TikTokNavigation.goToInbox(service, root)) {
                     TikTokNavigation.goToProfile(service, root)
@@ -71,8 +75,10 @@ class TikTokHandler : AppFeatureHandler {
             if (activeTab == TikTokTab.HOME) {
                 lastNavTimestamp = now
                 overlayManager?.showMindfulShakeAlert(
-                    title = "FYP TikTok Dibatasi",
-                    message = "Jebakan scrolling tanpa akhir terdeteksi. Tarik napas dan kendalikan kembali perhatianmu."
+                    emoji = "⚡",
+                    title = "FYP — Mesin Perhatian",
+                    message = "Algoritma TikTok belajar dari setiap detik scrollmu. Kamu atau mereka yang pegang kendali?",
+                    accentHex = "#B71C1C"
                 )
                 val switched = TikTokNavigation.goToFollowing(root)
                 if (switched) return true
