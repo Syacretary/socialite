@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import '../../core/localization/app_localizations.dart';
+import '../../core/motion/pressable_scale.dart';
+import '../../core/motion/staggered_entrance.dart';
 import '../../models/app_item.dart';
 import '../../providers/app_management_provider.dart';
 import '../../providers/settings_provider.dart';
@@ -42,32 +44,38 @@ class ManageAppScreen extends StatelessWidget {
                         crossAxisAlignment: CrossAxisAlignment.stretch,
                         children: [
                           // ZONA DIBATASI (RESTRICTED ZONE DROP TARGET)
-                          _buildRestrictedZone(context, loc, isDark, primaryColor),
+                          StaggeredEntrance(
+                            index: 0,
+                            child: _buildRestrictedZone(context, loc, isDark, primaryColor),
+                          ),
 
                           const SizedBox(height: 8),
 
                           // VISUAL DRAG CONNECTOR HINT
-                          Center(
-                            child: Padding(
-                              padding: const EdgeInsets.symmetric(vertical: 2),
-                              child: Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  Icon(
-                                    Icons.swap_vert_rounded,
-                                    size: 13,
-                                    color: isDark ? const Color(0xFF666666) : const Color(0xFF999999),
-                                  ),
-                                  const SizedBox(width: 4),
-                                  Text(
-                                    loc.get('dragHint'),
-                                    style: theme.textTheme.bodyMedium?.copyWith(
-                                      fontSize: 10,
-                                      fontWeight: FontWeight.w600,
+                          StaggeredEntrance(
+                            index: 1,
+                            child: Center(
+                              child: Padding(
+                                padding: const EdgeInsets.symmetric(vertical: 2),
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Icon(
+                                      Icons.swap_vert_rounded,
+                                      size: 13,
                                       color: isDark ? const Color(0xFF666666) : const Color(0xFF999999),
                                     ),
-                                  ),
-                                ],
+                                    const SizedBox(width: 4),
+                                    Text(
+                                      loc.get('dragHint'),
+                                      style: theme.textTheme.bodyMedium?.copyWith(
+                                        fontSize: 10,
+                                        fontWeight: FontWeight.w600,
+                                        color: isDark ? const Color(0xFF666666) : const Color(0xFF999999),
+                                      ),
+                                    ),
+                                  ],
+                                ),
                               ),
                             ),
                           ),
@@ -75,7 +83,10 @@ class ManageAppScreen extends StatelessWidget {
                           const SizedBox(height: 8),
 
                           // ZONA APLIKASI BEBAS (AVAILABLE APPS LIST & DROP TARGET)
-                          _buildAvailableZone(context, loc, isDark, primaryColor),
+                          StaggeredEntrance(
+                            index: 2,
+                            child: _buildAvailableZone(context, loc, isDark, primaryColor),
+                          ),
                         ],
                       ),
                     ),
@@ -338,8 +349,9 @@ class ManageAppScreen extends StatelessWidget {
   }) {
     final theme = Theme.of(context);
 
-    final cardContent = GestureDetector(
+    final cardContent = PressableScale(
       onTap: onTap,
+      pressedScale: 0.94,
       child: Container(
         width: 82, // Roomy compact width for enlarged icon
         padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 4),

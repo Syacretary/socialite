@@ -2,6 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import '../../core/localization/app_localizations.dart';
+import '../../core/motion/pressable_scale.dart';
+import '../../core/motion/smooth_toggle.dart';
+import '../../core/motion/staggered_entrance.dart';
 import '../../providers/screentime_provider.dart';
 import '../../providers/settings_provider.dart';
 import '../widgets/custom_app_bar.dart';
@@ -41,22 +44,34 @@ class SettingsScreen extends StatelessWidget {
                         crossAxisAlignment: CrossAxisAlignment.stretch,
                         children: [
                           // LANGUAGE SELECTOR
-                          _buildLanguageSection(context, loc, isDark, settings, primaryColor),
+                          StaggeredEntrance(
+                            index: 0,
+                            child: _buildLanguageSection(context, loc, isDark, settings, primaryColor),
+                          ),
 
                           const SizedBox(height: 10),
 
                           // THEME SELECTOR
-                          _buildThemeSection(context, loc, isDark, settings, primaryColor),
+                          StaggeredEntrance(
+                            index: 1,
+                            child: _buildThemeSection(context, loc, isDark, settings, primaryColor),
+                          ),
 
                           const SizedBox(height: 10),
 
                           // PERMISSIONS SECTION
-                          _buildPermissionsSection(context, loc, isDark, settings, screentime, primaryColor),
+                          StaggeredEntrance(
+                            index: 2,
+                            child: _buildPermissionsSection(context, loc, isDark, settings, screentime, primaryColor),
+                          ),
 
                           const SizedBox(height: 10),
 
                           // ABOUT & VERSION
-                          _buildAboutSection(context, loc, isDark, primaryColor),
+                          StaggeredEntrance(
+                            index: 3,
+                            child: _buildAboutSection(context, loc, isDark, primaryColor),
+                          ),
                         ],
                       ),
                     ),
@@ -347,7 +362,7 @@ class SettingsScreen extends StatelessWidget {
       onTap: onToggle,
       borderRadius: BorderRadius.circular(12),
       child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 3),
+        padding: const EdgeInsets.symmetric(vertical: 4),
         child: Row(
           children: [
             Expanded(
@@ -368,25 +383,11 @@ class SettingsScreen extends StatelessWidget {
                 ],
               ),
             ),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-              decoration: BoxDecoration(
-                color: isActive
-                    ? primaryColor
-                    : (isDark ? const Color(0xFF1E1E1E) : const Color(0xFFE2E4E8)),
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: Text(
-                isActive ? 'AKTIF' : 'OFF',
-                style: TextStyle(
-                  fontSize: 9,
-                  fontWeight: FontWeight.w800,
-                  letterSpacing: 0.5,
-                  color: isActive
-                      ? (isDark ? const Color(0xFF000000) : const Color(0xFFFFFFFF))
-                      : (isDark ? const Color(0xFF888888) : const Color(0xFF666666)),
-                ),
-              ),
+            const SizedBox(width: 10),
+            // Slow in, slow out toggle with stretch
+            SmoothToggle(
+              value: isActive,
+              onChanged: (_) => onToggle(),
             ),
           ],
         ),
@@ -403,10 +404,12 @@ class SettingsScreen extends StatelessWidget {
     required Color primaryColor,
     required VoidCallback onTap,
   }) {
-    return GestureDetector(
+    return PressableScale(
       onTap: onTap,
+      pressedScale: 0.95,
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 180),
+        curve: Curves.easeOutCubic,
         padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 8),
         decoration: BoxDecoration(
           color: isSelected

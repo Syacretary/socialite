@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import '../../core/localization/app_localizations.dart';
+import '../../core/motion/pressable_scale.dart';
+import '../../core/motion/staggered_entrance.dart';
 import '../../providers/app_management_provider.dart';
 import '../../providers/screentime_provider.dart';
 import '../../providers/settings_provider.dart';
@@ -51,22 +53,34 @@ class ScreentimeScreen extends StatelessWidget {
                         crossAxisAlignment: CrossAxisAlignment.stretch,
                         children: [
                           // PERMISSION CARD
-                          _buildPermissionBanner(context, loc, isDark, screentimeProvider, settings, primaryColor),
+                          StaggeredEntrance(
+                            index: 0,
+                            child: _buildPermissionBanner(context, loc, isDark, screentimeProvider, settings, primaryColor),
+                          ),
 
                           const SizedBox(height: 10),
 
                           // HERO STAT CARD
-                          _buildHeroStatCard(context, loc, isDark, totalFormatted, totalMinutes, primaryColor),
+                          StaggeredEntrance(
+                            index: 1,
+                            child: _buildHeroStatCard(context, loc, isDark, totalFormatted, totalMinutes, primaryColor),
+                          ),
 
                           const SizedBox(height: 10),
 
                           // WEEKLY 7-DAY MINI BAR CHART
-                          _buildWeeklyTrendCard(context, loc, isDark, screentimeProvider, primaryColor),
+                          StaggeredEntrance(
+                            index: 2,
+                            child: _buildWeeklyTrendCard(context, loc, isDark, screentimeProvider, primaryColor),
+                          ),
 
                           const SizedBox(height: 10),
 
                           // BREAKDOWN APPS LIST (Enlarged Unboxed Authentic Logos)
-                          _buildAppBreakdownList(context, loc, isDark, appsProvider, totalMinutes, primaryColor),
+                          StaggeredEntrance(
+                            index: 3,
+                            child: _buildAppBreakdownList(context, loc, isDark, appsProvider, totalMinutes, primaryColor),
+                          ),
                         ],
                       ),
                     ),
@@ -433,11 +447,11 @@ class ScreentimeScreen extends StatelessWidget {
               final app = sortedApps[index];
               final ratio = maxAppMinutes > 0 ? (app.usageMinutesToday / maxAppMinutes) : 0.0;
 
-              return InkWell(
+              return PressableScale(
                 onTap: () {
                   AppManagementDrawer.show(context, app.id);
                 },
-                borderRadius: BorderRadius.circular(12),
+                pressedScale: 0.97,
                 child: Padding(
                   padding: const EdgeInsets.symmetric(vertical: 2),
                   child: Row(

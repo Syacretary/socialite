@@ -26,6 +26,16 @@ void main() {
   );
 }
 
+class LifelitScrollBehavior extends MaterialScrollBehavior {
+  const LifelitScrollBehavior();
+
+  @override
+  ScrollPhysics getScrollPhysics(BuildContext context) {
+    // Rubber banding: pull past the end and it stretches and springs back upon release
+    return const BouncingScrollPhysics(parent: AlwaysScrollableScrollPhysics());
+  }
+}
+
 class LifelitApp extends StatelessWidget {
   const LifelitApp({super.key});
 
@@ -36,6 +46,7 @@ class LifelitApp extends StatelessWidget {
     return MaterialApp(
       title: 'Lifelit - Stop Doom Scrolling',
       debugShowCheckedModeBanner: false,
+      scrollBehavior: const LifelitScrollBehavior(),
       theme: AppTheme.lightTheme,
       darkTheme: AppTheme.darkTheme,
       themeMode: settings.themeMode,

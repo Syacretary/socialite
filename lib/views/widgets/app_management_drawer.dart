@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
+import '../../core/motion/pressable_scale.dart';
+import '../../core/motion/smooth_toggle.dart';
+import '../../core/motion/staggered_entrance.dart';
 import '../../models/app_item.dart';
 import '../../providers/app_management_provider.dart';
 import '../../providers/settings_provider.dart';
@@ -304,11 +307,20 @@ class _AppManagementDrawerState extends State<AppManagementDrawer> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        _buildDurationSection(context, app, provider, isDark, primaryColor, cardColor),
+        StaggeredEntrance(
+          index: 0,
+          child: _buildDurationSection(context, app, provider, isDark, primaryColor, cardColor),
+        ),
         const SizedBox(height: 12),
-        _buildActionSection(context, app, provider, isDark, primaryColor, cardColor),
+        StaggeredEntrance(
+          index: 1,
+          child: _buildActionSection(context, app, provider, isDark, primaryColor, cardColor),
+        ),
         const SizedBox(height: 20),
-        _buildAutoSavedNote(isDark),
+        StaggeredEntrance(
+          index: 2,
+          child: _buildAutoSavedNote(isDark),
+        ),
       ],
     );
   }
@@ -443,12 +455,11 @@ class _AppManagementDrawerState extends State<AppManagementDrawer> {
         bottom: 4,
         left: isChildOption ? 16 : 0,
       ),
-      child: InkWell(
+      child: PressableScale(
         onTap: () {
-          HapticFeedback.lightImpact();
           provider.toggleFeatureBlock(app.id, feat.id);
         },
-        borderRadius: BorderRadius.circular(12),
+        pressedScale: 0.98,
         child: Container(
           padding: EdgeInsets.symmetric(
             vertical: isMasterMode ? 8 : 4,
@@ -495,23 +506,28 @@ class _AppManagementDrawerState extends State<AppManagementDrawer> {
                         ),
                         if (isMasterMode) ...[
                           const SizedBox(width: 6),
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
-                            decoration: BoxDecoration(
-                              color: feat.isBlocked
-                                  ? primaryColor.withValues(alpha: 0.15)
-                                  : (isDark ? const Color(0xFF262626) : const Color(0xFFE0E0E0)),
-                              borderRadius: BorderRadius.circular(4),
-                            ),
-                            child: Text(
-                              'SEMUA FITUR',
-                              style: TextStyle(
-                                fontSize: 8.5,
-                                fontWeight: FontWeight.w800,
-                                letterSpacing: 0.4,
+                          AnimatedScale(
+                            duration: const Duration(milliseconds: 180),
+                            curve: Curves.easeOutBack,
+                            scale: feat.isBlocked ? 1.05 : 1.0,
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
+                              decoration: BoxDecoration(
                                 color: feat.isBlocked
-                                    ? primaryColor
-                                    : (isDark ? const Color(0xFF888888) : const Color(0xFF777777)),
+                                    ? primaryColor.withValues(alpha: 0.15)
+                                    : (isDark ? const Color(0xFF262626) : const Color(0xFFE0E0E0)),
+                                borderRadius: BorderRadius.circular(4),
+                              ),
+                              child: Text(
+                                'SEMUA FITUR',
+                                style: TextStyle(
+                                  fontSize: 8.5,
+                                  fontWeight: FontWeight.w800,
+                                  letterSpacing: 0.4,
+                                  color: feat.isBlocked
+                                      ? primaryColor
+                                      : (isDark ? const Color(0xFF888888) : const Color(0xFF777777)),
+                                ),
                               ),
                             ),
                           ),
@@ -530,33 +546,12 @@ class _AppManagementDrawerState extends State<AppManagementDrawer> {
                 ),
               ),
               const SizedBox(width: 12),
-              // Animated toggle switch
-              AnimatedContainer(
-                duration: const Duration(milliseconds: 200),
-                width: 40,
-                height: 24,
-                padding: const EdgeInsets.all(3),
-                decoration: BoxDecoration(
-                  color: feat.isBlocked
-                      ? primaryColor
-                      : (isDark ? const Color(0xFF262626) : const Color(0xFFD4D4D4)),
-                  borderRadius: BorderRadius.circular(14),
-                ),
-                child: AnimatedAlign(
-                  duration: const Duration(milliseconds: 200),
-                  curve: Curves.easeOutCubic,
-                  alignment: feat.isBlocked ? Alignment.centerRight : Alignment.centerLeft,
-                  child: Container(
-                    width: 18,
-                    height: 18,
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      color: feat.isBlocked
-                          ? (isDark ? const Color(0xFF000000) : const Color(0xFFFFFFFF))
-                          : (isDark ? const Color(0xFF777777) : const Color(0xFFFFFFFF)),
-                    ),
-                  ),
-                ),
+              // Slow in, slow out toggle with stretch
+              SmoothToggle(
+                value: feat.isBlocked,
+                onChanged: (_) {
+                  provider.toggleFeatureBlock(app.id, feat.id);
+                },
               ),
             ],
           ),

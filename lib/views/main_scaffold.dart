@@ -1,8 +1,10 @@
+import 'dart:math' as math;
 import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import '../core/localization/app_localizations.dart';
+import '../core/motion/pressable_scale.dart';
 import '../providers/app_management_provider.dart';
 import '../providers/settings_provider.dart';
 import '../services/feature_block_service.dart';
@@ -18,8 +20,14 @@ class MainScaffold extends StatefulWidget {
   State<MainScaffold> createState() => _MainScaffoldState();
 }
 
-class _MainScaffoldState extends State<MainScaffold> with WidgetsBindingObserver {
+class _MainScaffoldState extends State<MainScaffold>
+    with WidgetsBindingObserver, TickerProviderStateMixin {
   int _currentIndex = 0;
+
+  late final AnimationController _navController;
+  late final Animation<double> _navCurved;
+  double _fromIndex = 0.0;
+  double _toIndex = 0.0;
 
   final List<Widget> _screens = const [
     ManageAppScreen(),
@@ -31,6 +39,16 @@ class _MainScaffoldState extends State<MainScaffold> with WidgetsBindingObserver
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+
+    _navController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 250),
+    );
+    _navCurved = CurvedAnimation(
+      parent: _navController,
+      curve: Curves.easeInOutCubic,
+    );
+
     // Start limit enforcement after first frame so context & providers are ready
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
@@ -57,7 +75,21 @@ class _MainScaffoldState extends State<MainScaffold> with WidgetsBindingObserver
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
     LimitEnforcementService.instance.stop();
+    _navController.dispose();
     super.dispose();
+  }
+
+  void _onTabSelected(int index) {
+    if (_currentIndex == index) return;
+    HapticFeedback.selectionClick();
+    _fromIndex = _navController.isAnimating
+        ? lerpDouble(_fromIndex, _toIndex, _navCurved.value)!
+        : _currentIndex.toDouble();
+    _toIndex = index.toDouble();
+    setState(() {
+      _currentIndex = index;
+    });
+    _navController.forward(from: 0.0);
   }
 
   @override
@@ -73,7 +105,7 @@ class _MainScaffoldState extends State<MainScaffold> with WidgetsBindingObserver
     return Scaffold(
       extendBody: true,
       body: AnimatedSwitcher(
-        duration: const Duration(milliseconds: 280),
+        duration: const Duration(milliseconds: 240),
         switchInCurve: Curves.easeOutCubic,
         switchOutCurve: Curves.easeInCubic,
         transitionBuilder: (child, animation) {
@@ -110,70 +142,101 @@ class _MainScaffoldState extends State<MainScaffold> with WidgetsBindingObserver
                     decoration: BoxDecoration(
                       color: navBgColor.withOpacity(0.92),
                       borderRadius: BorderRadius.circular(30),
-                      // NO OUTLINES
                     ),
                     child: LayoutBuilder(
                       builder: (context, constraints) {
                         final tabWidth = constraints.maxWidth / 3;
 
-                        return Stack(
-                          children: [
-                            // SLIDING ANIMATED PILL INDICATOR
-                            AnimatedPositioned(
-                              duration: const Duration(milliseconds: 260),
-                              curve: Curves.easeOutCubic,
-                              left: _currentIndex * tabWidth,
-                              top: 0,
-                              bottom: 0,
-                              width: tabWidth,
-                              child: Container(
-                                decoration: BoxDecoration(
-                                  color: primaryColor,
-                                  borderRadius: BorderRadius.circular(26),
-                                  boxShadow: [
-                                    BoxShadow(
-                                      color: Colors.black.withOpacity(isDark ? 0.35 : 0.08),
-                                      blurRadius: 12,
-                                      offset: const Offset(0, 3),
+                        return AnimatedBuilder(
+                          animation: _navCurved,
+                          builder: (context, _) {
+                            final progress = _navController.isAnimating ? _navCurved.value : 1.0;
+                            final currentPos = lerpDouble(_fromIndex, _toIndex, progress)!;
+                            final leftPos = currentPos * tabWidth;
+
+                            // Squash and stretch physics:
+                            // Stretches along motion path, squashes on impact
+                            final double scaleX;
+                            final double scaleY;
+                            if (_navController.isAnimating) {
+                              if (progress < 0.70) {
+                                final t = (progress / 0.70);
+                                final midPeak = math.sin(t * math.pi);
+                                scaleX = 1.0 + (midPeak * 0.14);
+                                scaleY = 1.0 - (midPeak * 0.08);
+                              } else {
+                                final t = (progress - 0.70) / 0.30;
+                                final impactPeak = math.sin(t * math.pi);
+                                scaleX = 1.0 - (impactPeak * 0.06);
+                                scaleY = 1.0 + (impactPeak * 0.04);
+                              }
+                            } else {
+                              scaleX = 1.0;
+                              scaleY = 1.0;
+                            }
+
+                            return Stack(
+                              children: [
+                                // SQUASH & STRETCH ANIMATED PILL INDICATOR
+                                Positioned(
+                                  left: leftPos,
+                                  top: 0,
+                                  bottom: 0,
+                                  width: tabWidth,
+                                  child: Transform.scale(
+                                    scaleX: scaleX,
+                                    scaleY: scaleY,
+                                    child: Container(
+                                      decoration: BoxDecoration(
+                                        color: primaryColor,
+                                        borderRadius: BorderRadius.circular(26),
+                                        boxShadow: [
+                                          BoxShadow(
+                                            color: Colors.black.withOpacity(isDark ? 0.35 : 0.08),
+                                            blurRadius: 12,
+                                            offset: const Offset(0, 3),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ),
+                                ),
+
+                                // TAB ITEMS
+                                Row(
+                                  children: [
+                                    Expanded(
+                                      child: _buildNavItem(
+                                        index: 0,
+                                        icon: Icons.tune_rounded,
+                                        label: loc.get('navManage'),
+                                        isDark: isDark,
+                                        primaryColor: primaryColor,
+                                      ),
+                                    ),
+                                    Expanded(
+                                      child: _buildNavItem(
+                                        index: 1,
+                                        icon: Icons.hourglass_top_rounded,
+                                        label: loc.get('navScreentime'),
+                                        isDark: isDark,
+                                        primaryColor: primaryColor,
+                                      ),
+                                    ),
+                                    Expanded(
+                                      child: _buildNavItem(
+                                        index: 2,
+                                        icon: Icons.settings_rounded,
+                                        label: loc.get('navSettings'),
+                                        isDark: isDark,
+                                        primaryColor: primaryColor,
+                                      ),
                                     ),
                                   ],
                                 ),
-                              ),
-                            ),
-
-                            // TAB ITEMS
-                            Row(
-                              children: [
-                                Expanded(
-                                  child: _buildNavItem(
-                                    index: 0,
-                                    icon: Icons.tune_rounded,
-                                    label: loc.get('navManage'),
-                                    isDark: isDark,
-                                    primaryColor: primaryColor,
-                                  ),
-                                ),
-                                Expanded(
-                                  child: _buildNavItem(
-                                    index: 1,
-                                    icon: Icons.hourglass_top_rounded,
-                                    label: loc.get('navScreentime'),
-                                    isDark: isDark,
-                                    primaryColor: primaryColor,
-                                  ),
-                                ),
-                                Expanded(
-                                  child: _buildNavItem(
-                                    index: 2,
-                                    icon: Icons.settings_rounded,
-                                    label: loc.get('navSettings'),
-                                    isDark: isDark,
-                                    primaryColor: primaryColor,
-                                  ),
-                                ),
                               ],
-                            ),
-                          ],
+                            );
+                          },
                         );
                       },
                     ),
@@ -196,19 +259,14 @@ class _MainScaffoldState extends State<MainScaffold> with WidgetsBindingObserver
   }) {
     final isSelected = _currentIndex == index;
 
-    return GestureDetector(
-      onTap: () {
-        if (_currentIndex != index) {
-          HapticFeedback.selectionClick();
-          setState(() {
-            _currentIndex = index;
-          });
-        }
-      },
-      behavior: HitTestBehavior.opaque,
+    return PressableScale(
+      onTap: () => _onTabSelected(index),
+      pressedScale: 0.94,
+      enableHaptic: false,
       child: Center(
         child: AnimatedScale(
           duration: const Duration(milliseconds: 200),
+          curve: Curves.easeOutBack,
           scale: isSelected ? 1.05 : 1.0,
           child: Row(
             mainAxisSize: MainAxisSize.min,
