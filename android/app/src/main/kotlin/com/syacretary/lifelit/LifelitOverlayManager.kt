@@ -1,5 +1,7 @@
 package com.syacretary.lifelit
 
+import android.animation.AnimatorSet
+import android.animation.ObjectAnimator
 import android.content.Context
 import android.graphics.Color
 import android.graphics.PixelFormat
@@ -10,8 +12,10 @@ import android.os.Handler
 import android.os.Looper
 import android.text.TextUtils
 import android.view.Gravity
+import android.view.HapticFeedbackConstants
 import android.view.View
 import android.view.WindowManager
+import android.view.animation.DecelerateInterpolator
 import android.widget.FrameLayout
 import android.widget.ImageView
 import android.widget.LinearLayout
@@ -340,10 +344,190 @@ class LifelitOverlayManager(private val context: Context) {
         interventionShowing = false
     }
 
-    /** Hides both the feed mask and any active time-limit intervention. */
+    // ── Mindful Trigger Shake Pop-up (Exaggeration Shake + Auto-dismiss 1.5s) ──
+    private var shakeAlertView: View? = null
+    private var shakeAlertParams: WindowManager.LayoutParams? = null
+    private var isShakeAlertShowing = false
+    private var shakeAlertDismissRunnable: Runnable? = null
+    private var lastShakeAlertTime = 0L
+
+    /**
+     * Shows an exaggerated shake alert pop-up when user triggers a blocked feature
+     * (Shorts, Beranda, Reels, FYP). Shakes dramatically on impact to snap the user
+     * out of the automatic mindless scrolling trance, displays mindful consciousness
+     * recovery copy, and automatically disappears 1.5 seconds later.
+     */
+    fun showMindfulShakeAlert(
+        title: String = "Sadar Sejenak",
+        message: String = "Tarik napas perlahan. Apakah ini pilihan sadarmu atau sekadar autopilot jempol?"
+    ) {
+        val now = System.currentTimeMillis()
+        if (now - lastShakeAlertTime < 1600L && isShakeAlertShowing) {
+            // Already visible: re-shake with exaggeration to reinforce awareness
+            shakeAlertView?.let { performExaggeratedShake(it) }
+            return
+        }
+        lastShakeAlertTime = now
+
+        hideMindfulShakeAlert()
+
+        val alertCard = buildShakeAlertCard(title, message)
+        val params = WindowManager.LayoutParams(
+            WindowManager.LayoutParams.MATCH_PARENT,
+            WindowManager.LayoutParams.WRAP_CONTENT,
+            accessibilityOverlayType(),
+            WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
+                    WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE or
+                    WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN,
+            PixelFormat.TRANSLUCENT
+        ).apply {
+            gravity = Gravity.TOP or Gravity.CENTER_HORIZONTAL
+            x = 0
+            y = statusBarHeightPx() + dp(14)
+        }
+
+        shakeAlertView = alertCard
+        shakeAlertParams = params
+
+        try {
+            windowManager.addView(alertCard, params)
+            isShakeAlertShowing = true
+
+            // Trigger the Exaggeration Shake Animation on impact
+            performExaggeratedShake(alertCard)
+
+            // Auto-dismiss in exactly 1.5 seconds (1500ms)
+            val dismissRunnable = Runnable {
+                hideMindfulShakeAlertWithAnimation()
+            }
+            shakeAlertDismissRunnable = dismissRunnable
+            handler.postDelayed(dismissRunnable, 1500L)
+        } catch (e: Exception) {
+            e.printStackTrace()
+            shakeAlertView = null
+            shakeAlertParams = null
+            isShakeAlertShowing = false
+        }
+    }
+
+    private fun performExaggeratedShake(view: View) {
+        // Dramatic horizontal shake (Exaggeration principle)
+        val shakeAnim = ObjectAnimator.ofFloat(
+            view, "translationX",
+            0f, -28f, 28f, -22f, 22f, -14f, 14f, -6f, 6f, 0f
+        ).apply {
+            duration = 420L
+            interpolator = DecelerateInterpolator()
+        }
+
+        // Accompanying scale punch
+        val scaleX = ObjectAnimator.ofFloat(view, "scaleX", 0.90f, 1.05f, 0.98f, 1.0f).apply { duration = 300L }
+        val scaleY = ObjectAnimator.ofFloat(view, "scaleY", 0.90f, 1.05f, 0.98f, 1.0f).apply { duration = 300L }
+
+        AnimatorSet().apply {
+            playTogether(shakeAnim, scaleX, scaleY)
+            start()
+        }
+
+        try {
+            view.performHapticFeedback(HapticFeedbackConstants.LONG_PRESS)
+        } catch (_: Exception) {}
+    }
+
+    private fun hideMindfulShakeAlertWithAnimation() {
+        val view = shakeAlertView ?: return
+        view.animate()
+            .alpha(0f)
+            .translationY(-dp(20).toFloat())
+            .setDuration(200L)
+            .withEndAction {
+                hideMindfulShakeAlert()
+            }
+            .start()
+    }
+
+    fun hideMindfulShakeAlert() {
+        shakeAlertDismissRunnable?.let {
+            handler.removeCallbacks(it)
+            shakeAlertDismissRunnable = null
+        }
+        val view = shakeAlertView
+        if (view != null) {
+            try {
+                windowManager.removeView(view)
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
+        }
+        shakeAlertView = null
+        shakeAlertParams = null
+        isShakeAlertShowing = false
+    }
+
+    private fun buildShakeAlertCard(title: String, message: String): View {
+        val root = FrameLayout(context).apply {
+            setPadding(dp(16), 0, dp(16), 0)
+        }
+
+        val card = LinearLayout(context).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+            setPadding(dp(16), dp(12), dp(16), dp(12))
+            background = GradientDrawable().apply {
+                cornerRadius = dp(20).toFloat()
+                setColor(Color.parseColor("#F00D0D0D")) // Deep AMOLED
+                setStroke(dp(1), Color.parseColor("#55FFFFFF")) // Crisp luminous border
+            }
+            elevation = dp(14).toFloat()
+        }
+
+        // Mindful emblem spark icon
+        val icon = TextView(context).apply {
+            text = "⚡"
+            textSize = 22f
+            setPadding(0, 0, dp(12), 0)
+        }
+        card.addView(icon)
+
+        val textCol = LinearLayout(context).apply {
+            orientation = LinearLayout.VERTICAL
+        }
+
+        textCol.addView(TextView(context).apply {
+            text = title
+            setTextColor(Color.WHITE)
+            textSize = 13f
+            typeface = Typeface.DEFAULT_BOLD
+            letterSpacing = -0.02f
+        })
+
+        textCol.addView(TextView(context).apply {
+            text = message
+            setTextColor(Color.parseColor("#CCCCCC"))
+            textSize = 10.5f
+            setLineSpacing(dp(1).toFloat(), 1.25f)
+        })
+
+        card.addView(textCol, LinearLayout.LayoutParams(
+            0,
+            LinearLayout.LayoutParams.WRAP_CONTENT,
+            1f
+        ))
+
+        root.addView(card, FrameLayout.LayoutParams(
+            FrameLayout.LayoutParams.MATCH_PARENT,
+            FrameLayout.LayoutParams.WRAP_CONTENT,
+            Gravity.CENTER_HORIZONTAL
+        ))
+
+        return root
+    }
+
+    /** Hides both the feed mask, mindful shake alert, and any active time-limit intervention. */
     fun hideAllOverlays() {
         hideFeedBlockOverlay()
         hideLimitIntervention()
+        hideMindfulShakeAlert()
     }
 
     private fun buildInterventionDialog(

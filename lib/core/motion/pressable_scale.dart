@@ -83,26 +83,28 @@ class _PressableScaleState extends State<PressableScale>
 
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
-      behavior: widget.behavior,
-      onTapDown: _handleTapDown,
-      onTapUp: _handleTapUp,
-      onTapCancel: _handleTapCancel,
-      onLongPress: widget.onLongPress != null
-          ? () {
-              if (widget.enableHaptic) HapticFeedback.mediumImpact();
-              widget.onLongPress?.call();
-            }
-          : null,
-      child: AnimatedBuilder(
-        animation: _scaleAnimation,
-        builder: (context, child) {
-          return Transform.scale(
-            scale: _scaleAnimation.value,
-            child: child,
-          );
-        },
-        child: widget.child,
+    return RepaintBoundary(
+      child: GestureDetector(
+        behavior: widget.behavior,
+        onTapDown: _handleTapDown,
+        onTapUp: _handleTapUp,
+        onTapCancel: _handleTapCancel,
+        onLongPress: widget.onLongPress != null
+            ? () {
+                if (widget.enableHaptic) HapticFeedback.mediumImpact();
+                widget.onLongPress?.call();
+              }
+            : null,
+        child: AnimatedBuilder(
+          animation: _scaleAnimation,
+          builder: (context, child) {
+            return Transform.scale(
+              scale: _scaleAnimation.value,
+              child: child,
+            );
+          },
+          child: widget.child,
+        ),
       ),
     );
   }

@@ -21,7 +21,8 @@ class YouTubeHandler : AppFeatureHandler {
         service: AccessibilityService,
         root: AccessibilityNodeInfo,
         event: AccessibilityEvent,
-        rules: Set<String>
+        rules: Set<String>,
+        overlayManager: LifelitOverlayManager?
     ): Boolean {
         if (!rules.contains("disable_shorts")) return false
 
@@ -30,6 +31,10 @@ class YouTubeHandler : AppFeatureHandler {
 
         if (isShortsActive(root, event)) {
             lastNavTimestamp = now
+            overlayManager?.showMindfulShakeAlert(
+                title = "Shorts Dibatasi",
+                message = "Tarik napas perlahan. Sadari autopilot jempolmu dan kembali ke tujuan utamamu."
+            )
             redirectToHome(service, root)
             return true
         }
@@ -45,6 +50,10 @@ class YouTubeHandler : AppFeatureHandler {
         hideImmediate: () -> Unit
     ) {
         if (rules.contains("disable_shorts") && isShortsActive(root, null)) {
+            overlayManager.showMindfulShakeAlert(
+                title = "Shorts Dibatasi",
+                message = "Tarik napas perlahan. Sadari autopilot jempolmu dan kembali ke tujuan utamamu."
+            )
             redirectToHome(service, root)
             return
         }
@@ -59,6 +68,10 @@ class YouTubeHandler : AppFeatureHandler {
             // Overlay is closed/shown when on Beranda/Home from ANY previous page
             if (isHomeTab(root)) {
                 val bounds = calculateFeedBounds(service, root)
+                overlayManager.showMindfulShakeAlert(
+                    title = "Beranda YouTube Dibatasi",
+                    message = "Feed tanpa akhir mencuri waktumu. Gunakan bilah pencarian jika ada video yang ingin dicari."
+                )
                 overlayManager.showFeedBlockOverlay(
                     appName = "YouTube",
                     title = "Beranda YouTube Dibatasi",

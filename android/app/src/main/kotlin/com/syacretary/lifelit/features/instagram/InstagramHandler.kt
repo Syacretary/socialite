@@ -22,7 +22,8 @@ class InstagramHandler : AppFeatureHandler {
         service: AccessibilityService,
         root: AccessibilityNodeInfo,
         event: AccessibilityEvent,
-        rules: Set<String>
+        rules: Set<String>,
+        overlayManager: LifelitOverlayManager?
     ): Boolean {
         val now = System.currentTimeMillis()
         if (now - lastNavTimestamp < NAV_COOLDOWN_MS) return false
@@ -46,6 +47,10 @@ class InstagramHandler : AppFeatureHandler {
         // 1. Stories Blocking
         if (storiesBlocked && InstagramStoriesFeature.isStoryActive(service, root, event)) {
             lastNavTimestamp = now
+            overlayManager?.showMindfulShakeAlert(
+                title = "Stories Dibatasi",
+                message = "Berhenti sejenak. Apa yang benar-benar penting untukmu saat ini?"
+            )
             InstagramStoriesFeature.blockStory(service)
             return true
         }
@@ -61,6 +66,10 @@ class InstagramHandler : AppFeatureHandler {
             }
 
             lastNavTimestamp = now
+            overlayManager?.showMindfulShakeAlert(
+                title = "Reels Dibatasi",
+                message = "Jebakan dopamin singkat terdeteksi. Tarik napas 3 detik dan sadari pilihanmu."
+            )
             InstagramReelsFeature.handleReelsBlocked(service, root, rules, isNavBarReels)
             return true
         }
@@ -70,6 +79,10 @@ class InstagramHandler : AppFeatureHandler {
             val activeTab = InstagramNavigation.getActiveTab(root)
             if (activeTab == InstagramTab.HOME) {
                 lastNavTimestamp = now
+                overlayManager?.showMindfulShakeAlert(
+                    title = "Beranda Instagram Dibatasi",
+                    message = "Tarik napas dalam-dalam. Apakah ini pilihan sadarmu atau sekadar autopilot jempol?"
+                )
                 val clicked = InstagramHomeFeature.handleHomeBlocked(service, root)
                 if (clicked) return true
             }

@@ -104,25 +104,10 @@ class _MainScaffoldState extends State<MainScaffold>
 
     return Scaffold(
       extendBody: true,
-      body: AnimatedSwitcher(
-        duration: const Duration(milliseconds: 240),
-        switchInCurve: Curves.easeOutCubic,
-        switchOutCurve: Curves.easeInCubic,
-        transitionBuilder: (child, animation) {
-          return FadeTransition(
-            opacity: animation,
-            child: SlideTransition(
-              position: Tween<Offset>(
-                begin: const Offset(0.0, 0.02),
-                end: Offset.zero,
-              ).animate(animation),
-              child: child,
-            ),
-          );
-        },
-        child: KeyedSubtree(
-          key: ValueKey<int>(_currentIndex),
-          child: _screens[_currentIndex],
+      body: RepaintBoundary(
+        child: IndexedStack(
+          index: _currentIndex,
+          children: _screens.map((screen) => RepaintBoundary(child: screen)).toList(),
         ),
       ),
       bottomNavigationBar: SafeArea(
@@ -132,18 +117,22 @@ class _MainScaffoldState extends State<MainScaffold>
             constraints: const BoxConstraints(maxWidth: 420),
             child: Padding(
               padding: const EdgeInsets.fromLTRB(20, 0, 20, 14),
-              child: ClipRRect(
-                borderRadius: BorderRadius.circular(30),
-                child: BackdropFilter(
-                  filter: ImageFilter.blur(sigmaX: 30, sigmaY: 30),
-                  child: Container(
-                    height: 60,
-                    padding: const EdgeInsets.all(4),
-                    decoration: BoxDecoration(
-                      color: navBgColor.withOpacity(0.92),
-                      borderRadius: BorderRadius.circular(30),
-                    ),
-                    child: LayoutBuilder(
+              child: RepaintBoundary(
+                child: Container(
+                  height: 60,
+                  padding: const EdgeInsets.all(4),
+                  decoration: BoxDecoration(
+                    color: navBgColor.withOpacity(0.96),
+                    borderRadius: BorderRadius.circular(30),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withOpacity(isDark ? 0.40 : 0.08),
+                        blurRadius: 16,
+                        offset: const Offset(0, 4),
+                      ),
+                    ],
+                  ),
+                  child: LayoutBuilder(
                       builder: (context, constraints) {
                         final tabWidth = constraints.maxWidth / 3;
 
@@ -246,7 +235,6 @@ class _MainScaffoldState extends State<MainScaffold>
             ),
           ),
         ),
-      ),
     );
   }
 

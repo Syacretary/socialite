@@ -26,7 +26,8 @@ class TikTokHandler : AppFeatureHandler {
         service: AccessibilityService,
         root: AccessibilityNodeInfo,
         event: AccessibilityEvent,
-        rules: Set<String>
+        rules: Set<String>,
+        overlayManager: LifelitOverlayManager?
     ): Boolean {
         val now = System.currentTimeMillis()
         if (now - lastNavTimestamp < NAV_COOLDOWN_MS) return false
@@ -38,6 +39,10 @@ class TikTokHandler : AppFeatureHandler {
         // 1. Stories Blocking
         if (storiesBlocked && TikTokNavigation.isStoryActive(root, event)) {
             lastNavTimestamp = now
+            overlayManager?.showMindfulShakeAlert(
+                title = "Stories Dibatasi",
+                message = "Berhenti sejenak. Kembalikan fokusmu ke hal yang bermakna."
+            )
             service.performGlobalAction(AccessibilityService.GLOBAL_ACTION_BACK)
             return true
         }
@@ -47,6 +52,10 @@ class TikTokHandler : AppFeatureHandler {
             val activeTab = TikTokNavigation.getActiveTab(root)
             if (activeTab != TikTokTab.INBOX && activeTab != TikTokTab.PROFILE) {
                 lastNavTimestamp = now
+                overlayManager?.showMindfulShakeAlert(
+                    title = "TikTok Dibatasi",
+                    message = "Hanya DM dan Profil yang diizinkan. Sadari autopilot jempolmu."
+                )
                 val redirected = if (!TikTokNavigation.goToInbox(service, root)) {
                     TikTokNavigation.goToProfile(service, root)
                 } else {
@@ -58,8 +67,13 @@ class TikTokHandler : AppFeatureHandler {
 
         // 3. FYP Blocking: Instantly switch to Following tab
         if (fypBlocked && !dmOnly) {
-            if (TikTokNavigation.isForYouTabSelected(root)) {
+            val activeTab = TikTokNavigation.getActiveTab(root)
+            if (activeTab == TikTokTab.HOME) {
                 lastNavTimestamp = now
+                overlayManager?.showMindfulShakeAlert(
+                    title = "FYP TikTok Dibatasi",
+                    message = "Jebakan scrolling tanpa akhir terdeteksi. Tarik napas dan kendalikan kembali perhatianmu."
+                )
                 val switched = TikTokNavigation.goToFollowing(root)
                 if (switched) return true
             }

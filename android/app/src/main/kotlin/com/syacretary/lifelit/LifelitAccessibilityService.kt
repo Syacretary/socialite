@@ -356,7 +356,7 @@ class LifelitAccessibilityService : AccessibilityService() {
         if (root != null) {
             val rules = getRulesForPackage(pkg)
             if (rules.isNotEmpty()) {
-                val handled = handler.onFastRedirect(this, root, event, rules)
+                val handled = handler.onFastRedirect(this, root, event, rules, overlayManager)
                 if (handled) {
                     hideOverlayImmediate()
                     return

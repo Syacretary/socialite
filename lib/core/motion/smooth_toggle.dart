@@ -103,57 +103,59 @@ class _SmoothToggleState extends State<SmoothToggle>
     const thumbBaseSize = 18.0;
     const maxStretch = 3.5; // thumb stretches by 3.5px during travel
 
-    return GestureDetector(
-      onTap: _handleTap,
-      behavior: HitTestBehavior.opaque,
-      child: AnimatedBuilder(
-        animation: _controller,
-        builder: (context, _) {
-          final t = _position.value;
-          final currentBg = Color.lerp(inactiveBg, primaryColor, t)!;
-          final thumbWidth = thumbBaseSize + (_stretch.value * maxStretch);
-          final travelDistance = trackWidth - 6.0 - thumbWidth;
-          final thumbLeft = 3.0 + (t * travelDistance);
+    return RepaintBoundary(
+      child: GestureDetector(
+        onTap: _handleTap,
+        behavior: HitTestBehavior.opaque,
+        child: AnimatedBuilder(
+          animation: _controller,
+          builder: (context, _) {
+            final t = _position.value;
+            final currentBg = Color.lerp(inactiveBg, primaryColor, t)!;
+            final thumbWidth = thumbBaseSize + (_stretch.value * maxStretch);
+            final travelDistance = trackWidth - 6.0 - thumbWidth;
+            final thumbLeft = 3.0 + (t * travelDistance);
 
-          final thumbCol = widget.thumbColor ??
-              (Color.lerp(
-                isDark ? const Color(0xFF777777) : const Color(0xFFFFFFFF),
-                isDark ? const Color(0xFF000000) : const Color(0xFFFFFFFF),
-                t,
-              )!);
+            final thumbCol = widget.thumbColor ??
+                (Color.lerp(
+                  isDark ? const Color(0xFF777777) : const Color(0xFFFFFFFF),
+                  isDark ? const Color(0xFF000000) : const Color(0xFFFFFFFF),
+                  t,
+                )!);
 
-          return Container(
-            width: trackWidth,
-            height: trackHeight,
-            decoration: BoxDecoration(
-              color: currentBg,
-              borderRadius: BorderRadius.circular(14),
-            ),
-            child: Stack(
-              alignment: Alignment.centerLeft,
-              children: [
-                Positioned(
-                  left: thumbLeft,
-                  child: Container(
-                    width: thumbWidth,
-                    height: thumbBaseSize,
-                    decoration: BoxDecoration(
-                      color: thumbCol,
-                      borderRadius: BorderRadius.circular(thumbBaseSize / 2),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withOpacity(0.12),
-                          blurRadius: 4,
-                          offset: const Offset(0, 1.5),
-                        ),
-                      ],
+            return Container(
+              width: trackWidth,
+              height: trackHeight,
+              decoration: BoxDecoration(
+                color: currentBg,
+                borderRadius: BorderRadius.circular(14),
+              ),
+              child: Stack(
+                alignment: Alignment.centerLeft,
+                children: [
+                  Positioned(
+                    left: thumbLeft,
+                    child: Container(
+                      width: thumbWidth,
+                      height: thumbBaseSize,
+                      decoration: BoxDecoration(
+                        color: thumbCol,
+                        borderRadius: BorderRadius.circular(thumbBaseSize / 2),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withOpacity(0.12),
+                            blurRadius: 4,
+                            offset: const Offset(0, 1.5),
+                          ),
+                        ],
+                      ),
                     ),
                   ),
-                ),
-              ],
-            ),
-          );
-        },
+                ],
+              ),
+            );
+          },
+        ),
       ),
     );
   }

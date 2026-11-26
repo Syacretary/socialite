@@ -15,7 +15,8 @@ class TwitterHandler : AppFeatureHandler {
         service: AccessibilityService,
         root: AccessibilityNodeInfo,
         event: AccessibilityEvent,
-        rules: Set<String>
+        rules: Set<String>,
+        overlayManager: LifelitOverlayManager?
     ): Boolean {
         return false
     }

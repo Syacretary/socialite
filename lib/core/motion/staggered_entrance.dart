@@ -57,18 +57,26 @@ class _StaggeredEntranceState extends State<StaggeredEntrance>
 
   @override
   Widget build(BuildContext context) {
-    return AnimatedBuilder(
-      animation: _controller,
-      builder: (context, child) {
-        return Opacity(
-          opacity: _opacity.value,
-          child: Transform.translate(
-            offset: _slide.value,
-            child: child,
-          ),
-        );
-      },
-      child: widget.child,
+    // Zero-overhead fast path: once entrance completes, render raw child
+    // without running any active Ticker, Opacity, or Transform layers!
+    if (_controller.isCompleted) {
+      return widget.child;
+    }
+
+    return RepaintBoundary(
+      child: AnimatedBuilder(
+        animation: _controller,
+        builder: (context, child) {
+          return Opacity(
+            opacity: _opacity.value,
+            child: Transform.translate(
+              offset: _slide.value,
+              child: child,
+            ),
+          );
+        },
+        child: widget.child,
+      ),
     );
   }
 }

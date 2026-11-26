@@ -62,16 +62,18 @@ class FeatherScrollWrapper extends StatelessWidget {
           left: 0,
           right: 0,
           height: 22,
-          child: IgnorePointer(
-            child: Container(
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  begin: Alignment.topCenter,
-                  end: Alignment.bottomCenter,
-                  colors: [
-                    bgColor,
-                    bgColor.withOpacity(0.0),
-                  ],
+          child: RepaintBoundary(
+            child: IgnorePointer(
+              child: Container(
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
+                    colors: [
+                      bgColor,
+                      bgColor.withOpacity(0.0),
+                    ],
+                  ),
                 ),
               ),
             ),

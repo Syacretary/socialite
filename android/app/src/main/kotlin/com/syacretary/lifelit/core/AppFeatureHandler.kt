@@ -16,7 +16,8 @@ interface AppFeatureHandler {
         service: AccessibilityService,
         root: AccessibilityNodeInfo,
         event: AccessibilityEvent,
-        rules: Set<String>
+        rules: Set<String>,
+        overlayManager: LifelitOverlayManager? = null
     ): Boolean
 
     /**
